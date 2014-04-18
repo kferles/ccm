@@ -1,7 +1,5 @@
 package util;
 
-import config.ConfigParameters;
-
 import java.io.IOException;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
@@ -14,8 +12,6 @@ import java.nio.file.Path;
 public class FileSystemMethods {
 
     private static FileSystem fs = FileSystems.getDefault();
-
-    private static int bufferSize = ConfigParameters.getInstance().getBufferSize();
 
     public static Path getPath(String filename){
         return fs.getPath(filename);

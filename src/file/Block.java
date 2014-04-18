@@ -13,6 +13,8 @@ public class Block {
 
     private static final int bufferSize = ConfigParameters.getInstance().getBufferSize();
 
+    private BlockFile bf;
+
     private FileChannel channel;
 
     private int blockNum;
@@ -21,10 +23,13 @@ public class Block {
 
     private boolean dirty = false;
 
-    public Block(int blockNum, ByteBuffer buffer, FileChannel channel){
+    private boolean disposed = false;
+
+    public Block(int blockNum, ByteBuffer buffer, BlockFile bf){
         this.blockNum = blockNum;
         this.buffer = buffer;
-        this.channel = channel;
+        this.bf = bf;
+        this.channel = bf.getChannel();
     }
 
     public int getBlockNum() {
@@ -62,9 +67,25 @@ public class Block {
         return this.buffer.get(index);
     }
 
+    public BlockFile getBlockFile(){
+        return this.bf;
+    }
+
+    public FileChannel getChannel(){
+        return this.channel;
+    }
+
+    public boolean isDisposed() {
+        return disposed;
+    }
+
+    public void setDisposed(boolean disposed) {
+        this.disposed = disposed;
+    }
+
     public void writeToFile() throws IOException {
-        assert this.blockNum > 0;
-        assert this.dirty == true;
+        assert this.blockNum >= 0;
+        assert this.dirty;
 
         buffer.position(0);
         channel.position(bufferSize*blockNum);
@@ -76,19 +97,22 @@ public class Block {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if(this == o) return true;
+        if(o == null || getClass() != o.getClass()) return false;
 
         Block block = (Block) o;
 
-        if (blockNum != block.blockNum) return false;
+        if(blockNum != block.blockNum) return false;
+        if(!channel.equals(block.channel)) return false;
 
         return true;
     }
 
     @Override
     public int hashCode() {
-        return blockNum;
+        int result = channel.hashCode();
+        result = 31 * result + blockNum;
+        return result;
     }
 
     @Override

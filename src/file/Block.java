@@ -2,12 +2,18 @@ package file;
 
 import config.ConfigParameters;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 
 /**
  * Created by kostas on 4/16/14.
  */
 public class Block {
+
+    private static final int bufferSize = ConfigParameters.getInstance().getBufferSize();
+
+    private FileChannel channel;
 
     private int blockNum;
 
@@ -15,9 +21,10 @@ public class Block {
 
     private boolean dirty = false;
 
-    public Block(int blockNum, ByteBuffer buffer){
+    public Block(int blockNum, ByteBuffer buffer, FileChannel channel){
         this.blockNum = blockNum;
         this.buffer = buffer;
+        this.channel = channel;
     }
 
     public int getBlockNum() {
@@ -29,15 +36,12 @@ public class Block {
     }
 
     public void setBlockNum(int blockNum) {
+        this.dirty = true;
         this.blockNum = blockNum;
     }
 
     public boolean isDirty() {
         return dirty;
-    }
-
-    public void setDirty(boolean dirty){
-        this.dirty = dirty;
     }
 
     public void putInt(int index, int value){
@@ -56,6 +60,18 @@ public class Block {
 
     public byte getByte(int index){
         return this.buffer.get(index);
+    }
+
+    public void writeToFile() throws IOException {
+        assert this.blockNum > 0;
+        assert this.dirty == true;
+
+        buffer.position(0);
+        channel.position(bufferSize*blockNum);
+        while (buffer.hasRemaining())
+            channel.write(buffer);
+        channel.force(true);
+        this.dirty = false;
     }
 
     @Override

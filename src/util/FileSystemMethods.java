@@ -3,8 +3,6 @@ package util;
 import config.ConfigParameters;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -29,17 +27,6 @@ public class FileSystemMethods {
 
     public static void createFile(Path p) throws IOException {
         Files.createFile(p);
-    }
-
-    public static void writeBufferToFile(FileChannel channel, ByteBuffer buf, int bufNum) throws IOException {
-        assert bufNum > 0;
-
-        buf.limit(bufferSize);
-        buf.position(0);
-        channel.position(bufferSize*bufNum);
-        while (buf.hasRemaining())
-            channel.write(buf);
-        channel.force(true);
     }
 
 }

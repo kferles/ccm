@@ -19,7 +19,9 @@ import static util.FileSystemMethods.*;
  */
 public class BlockFile {
 
-    //TODO: check when loading a block that it's still valid, same at dispose
+    public static final int HEADER_METADATA_SIZE = 8;
+
+    public static final int BLOCK_METADATA_SIZE = 1;
 
     private static final int bufferSize = ConfigParameters.getInstance().getBufferSize();
 
@@ -30,10 +32,6 @@ public class BlockFile {
     private static final int FREE_LIST_HEAD_OFFSET = 4;
 
     private static final int ACTIVE_BLOCK_OFFSET = 0;
-
-    private static final int HEADER_METADATA_SIZE = 8;
-
-    private static final int BLOCK_METADATA_SIZE = 1;
 
     private static final byte ACTIVE_BLOCK = 1;
 
@@ -48,10 +46,11 @@ public class BlockFile {
     private Map<Integer, Block> loadedBlocks = new HashMap<>();
 
     private void initializeMetadata() throws IOException {
-        ByteBuffer buf = bufManager.getBuffer();
-        buf.putInt(0);
-        buf.putInt(-1);
-        writeBufferToFile(channel, buf, 0);
+        Block header = allocateNewBlock();
+        header.putInt(NUM_OF_BLOCKS_OFFSET, 0);
+        header.putInt(FREE_LIST_HEAD_OFFSET, -1);
+        header.setBlockNum(0);
+        header.writeToFile();
     }
 
     private void loadMetadata() throws IOException {
@@ -64,9 +63,8 @@ public class BlockFile {
     private void updateNumOfBlocks(int newValue) throws IOException {
         Block header = loadBlock(0);
         header.putInt(NUM_OF_BLOCKS_OFFSET, newValue);
-        writeBufferToFile(channel, header.getBuffer(), 0);
-        numOfBlocks = newValue;
         commitBlock(header);
+        numOfBlocks = newValue;
     }
 
     private void updateFreeListHead(Block newHead) throws IOException {
@@ -75,9 +73,12 @@ public class BlockFile {
         int newFreeListHead = newHead.getBlockNum();
         header.putInt(FREE_LIST_HEAD_OFFSET, newFreeListHead); //update free list head in metadata block
         newHead.putInt(BLOCK_METADATA_SIZE, freeListHead); //update next block in the new head
-        freeListHead = newFreeListHead;
+        newHead.putByte(ACTIVE_BLOCK_OFFSET, FREE_BLOCK);
 
+        commitBlock(newHead);
         commitBlock(header);
+
+        freeListHead = newFreeListHead;
     }
 
     private Block popFreeListHead() throws IOException {
@@ -90,9 +91,9 @@ public class BlockFile {
             int newFreeListHead = rv.getInt(BLOCK_METADATA_SIZE);
 
             header.putInt(FREE_LIST_HEAD_OFFSET, newFreeListHead); //update free list head
-            freeListHead = newFreeListHead;
-
             commitBlock(header);
+
+            freeListHead = newFreeListHead;
         }
         return rv;
     }
@@ -126,13 +127,13 @@ public class BlockFile {
         ByteBuffer buffer = bufManager.getBuffer();
         channel.read(buffer, num*bufferSize);
 
-        Block rv = new Block(num, buffer);
+        Block rv = new Block(num, buffer, channel);
         loadedBlocks.put(num, rv);
 
         return rv;
     }
 
-    public void commitBlock(Block block) throws IOException {
+    public final void commitBlock(Block block) throws IOException {
 
         int blockNum = block.getBlockNum();
 
@@ -143,13 +144,11 @@ public class BlockFile {
         else{
             updateNumOfBlocks(numOfBlocks + 1);
             block.setBlockNum(numOfBlocks);
-            block.setDirty(true); //just to be sure
         }
         ByteBuffer buffer = block.getBuffer();
 
         if(block.isDirty()){
-            writeBufferToFile(channel, buffer, block.getBlockNum());
-            block.setDirty(false);
+            block.writeToFile();
         }
 
         bufManager.releaseBuffer(buffer);
@@ -169,35 +168,21 @@ public class BlockFile {
         if(blockNum != -1){
             assert loadedBlocks.containsKey(blockNum);
             updateFreeListHead(block);
-            block.putByte(ACTIVE_BLOCK_OFFSET, FREE_BLOCK);
-            commitBlock(block);
         }
 
         bufManager.releaseBuffer(block.getBuffer());
     }
 
-    public Block allocateNewBlock() throws IOException {
+    public final Block allocateNewBlock() throws IOException {
         Block rv = popFreeListHead();
 
         if(rv == null){
            ByteBuffer buffer = bufManager.getBuffer();
-           rv = new Block(-1, buffer);
+           rv = new Block(-1, buffer, channel);
         }
         rv.putByte(ACTIVE_BLOCK_OFFSET, ACTIVE_BLOCK);
 
         return rv;
-    }
-
-    public static int getActiveBlockOffset() {
-        return ACTIVE_BLOCK_OFFSET;
-    }
-
-    public static int getHeaderMetadataSize() {
-        return HEADER_METADATA_SIZE;
-    }
-
-    public static int getBlockMetadataSize() {
-        return BLOCK_METADATA_SIZE;
     }
 
     public int getNumOfBlocks(){

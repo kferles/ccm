@@ -97,4 +97,10 @@ public class EmployeeRecord implements SerializableRecord {
         return rv;
     }
 
+    @Override
+    public String toString(){
+        return "[" + id + ", " + new String(firstName) + ", "
+                   + new String(lastName) + "]";
+    }
+
 }

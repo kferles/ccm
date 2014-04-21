@@ -125,7 +125,7 @@ public class HeapRecordFile<R extends SerializableRecord> {
         }
     }
 
-    public void insertRecord(R record) throws IOException {
+    public RecordPointer insertRecord(R record) throws IOException {
 
         byte[] rec = record.toByteArray();
 
@@ -151,6 +151,8 @@ public class HeapRecordFile<R extends SerializableRecord> {
 
         for(int i = 0; i < recordSize; ++i)
             toInsert.putByte(recOffset + i, rec[i]);
+
+        return insertPtr;
     }
 
     public void deleteRecord(RecordPointer recPtr) throws IOException {

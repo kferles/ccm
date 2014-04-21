@@ -198,6 +198,10 @@ public final class BlockFile {
         return rv;
     }
 
+    public int getNumOfBlocks() throws IOException {
+        return this.getNumOfBlocks(loadBlock(0));
+    }
+
     @Override
     public String toString(){
         StringBuilder rv = new StringBuilder();

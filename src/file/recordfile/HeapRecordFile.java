@@ -72,8 +72,8 @@ public class HeapRecordFile {
     }
 
     private void updateRecPtr(Block block, int src, int dest){
-        int destRecOffset = FIRST_RECORD_OFFSET + dest*recordSize;
-        updateRecPtr(block, src, new RecordPointer(block.getBlockNum(), destRecOffset));
+        assert src < recordsPerBlock && dest < recordsPerBlock;
+        updateRecPtr(block, src, new RecordPointer(block.getBlockNum(), dest));
     }
 
     private Block allocateNewBlock() throws IOException {
@@ -145,6 +145,16 @@ public class HeapRecordFile {
 
         for(int i = 0; i < recordSize; ++i)
             toInsert.putByte(recOffset + i, rec[i]);
+    }
+
+    public void deleteRecord(RecordPointer recPtr) throws IOException {
+        Block header = blockFile.loadBlock(0);
+        RecordPointer freeListHead = getFreeListHead(header);
+
+        Block deleteFrom = blockFile.loadBlock(recPtr.getBlockNum());
+        updateRecPtr(deleteFrom, recPtr.getBlockOffset(), freeListHead);
+
+        updateFreeListHead(header, recPtr);
     }
 
 }

@@ -1,4 +1,4 @@
-package file;
+package file.blockfile;
 
 import buffermanager.BufferManager;
 import config.ConfigParameters;

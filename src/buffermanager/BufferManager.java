@@ -2,8 +2,8 @@ package buffermanager;
 
 import config.ConfigParameters;
 import exception.InvalidBlockExcepxtion;
-import file.Block;
-import file.BlockFile;
+import file.blockfile.Block;
+import file.blockfile.BlockFile;
 import util.Pair;
 import xaction.Xaction;
 

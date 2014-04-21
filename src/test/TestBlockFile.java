@@ -1,8 +1,8 @@
 package test;
 
 import exception.InvalidBlockExcepxtion;
-import file.Block;
-import file.BlockFile;
+import file.blockfile.Block;
+import file.blockfile.BlockFile;
 import xaction.Xaction;
 
 import java.io.IOException;

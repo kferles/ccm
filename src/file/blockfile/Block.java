@@ -1,4 +1,4 @@
-package file;
+package file.blockfile;
 
 import config.ConfigParameters;
 

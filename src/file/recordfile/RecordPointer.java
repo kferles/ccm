@@ -42,4 +42,9 @@ public class RecordPointer {
     public int hashCode() {
         return pointer.hashCode();
     }
+
+    @Override
+    public String toString(){
+        return "[" + pointer.first + ", " + pointer.second + "]";
+    }
 }

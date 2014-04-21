@@ -1,4 +1,4 @@
-package file;
+package file.recordfile;
 
 import config.ConfigParameters;
 import exception.InvalidRecordSize;

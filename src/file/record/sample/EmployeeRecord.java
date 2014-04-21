@@ -34,8 +34,7 @@ public class EmployeeRecord implements SerializableRecord {
     private void moveFromByteArray(byte[] dest, int fromIndex, byte[] src){
         assert dest.length - fromIndex >= src.length;
 
-        for(int i = 0; i < src.length; ++i)
-            dest[fromIndex + i] = src[i];
+        System.arraycopy(src, 0, dest, fromIndex, src.length);
     }
 
     private static void copyFromString(char[] dest, String src){

@@ -18,6 +18,7 @@ import static util.FileSystemMethods.*;
 /**
  * Created by kostas on 4/15/14.
  */
+//TODO: Which methods should be synchronized?
 public final class BlockFile {
 
     public static final int HEADER_METADATA_SIZE = 8;
@@ -43,46 +44,40 @@ public final class BlockFile {
     private Map<Integer, Block> loadedBlocks = new HashMap<>();
 
     private void initializeMetadata() throws IOException {
-        Block header = new Block(0, ByteBuffer.allocateDirect(bufferSize), this);
+        Block header = new Block(0, ByteBuffer.allocateDirect(bufferSize), this, false);
         header.putInt(NUM_OF_BLOCKS_OFFSET, 0);
         header.putInt(FREE_LIST_HEAD_OFFSET, -1);
         header.setBlockNum(0);
         header.writeToFile();
     }
 
-    private int getNumOfBlocks() throws IOException {
-        Block header = loadBlock(0);
+    private int getNumOfBlocks(Block header) throws IOException {
         return header.getInt(NUM_OF_BLOCKS_OFFSET);
     }
 
-    private int getFreeListHead() throws IOException {
-        Block header = loadBlock(0);
+    private int getFreeListHead(Block header) throws IOException {
         return header.getInt(FREE_LIST_HEAD_OFFSET);
     }
 
-    private void updateNumOfBlocks(int newValue) throws IOException {
-        Block header = loadBlock(0);
+    private void updateNumOfBlocks(Block header, int newValue) throws IOException {
         header.putInt(NUM_OF_BLOCKS_OFFSET, newValue);
     }
 
-    private void updateFreeListHead(Block newHead) throws IOException {
-        Block header = loadBlock(0);
+    private void updateFreeListHead(Block header, Block newHead) throws IOException {
 
         int newFreeListHead = newHead.getBlockNum();
-        int oldFreeListHead = getFreeListHead();
+        int oldFreeListHead = getFreeListHead(header);
         header.putInt(FREE_LIST_HEAD_OFFSET, newFreeListHead); //update free list head in metadata block
         newHead.putInt(BLOCK_METADATA_SIZE, oldFreeListHead); //update next block in the new head
         newHead.putByte(ACTIVE_BLOCK_OFFSET, FREE_BLOCK);
     }
 
-    private Block popFreeListHead() throws IOException {
+    private Block popFreeListHead(Block header) throws IOException {
         Block rv = null;
-        int freeListHead = getFreeListHead();
+        int freeListHead = getFreeListHead(header);
 
         if(freeListHead != -1){
             rv = loadBlock(freeListHead);
-
-            Block header = loadBlock(0);
 
             int newFreeListHead = rv.getInt(BLOCK_METADATA_SIZE);
 
@@ -118,7 +113,7 @@ public final class BlockFile {
 
     public Block loadBlock(int num) throws IOException {
 
-        assert num == 0 || num <= getNumOfBlocks();
+        //TODO: insert a numOfBlocks variable for -> assert num == 0 || num <= getNumOfBlocks();
 
         if(loadedBlocks.containsKey(num)){
             Block rv = loadedBlocks.get(num);
@@ -132,23 +127,12 @@ public final class BlockFile {
         return rv;
     }
 
-    public void commitBlock(Block block) throws IOException {
+    public void commitBlock(Block block) throws IOException, InvalidBlockExcepxtion {
 
         int blockNum = block.getBlockNum();
 
-        if(blockNum != -1){
-            assert loadedBlocks.containsKey(blockNum);
-            loadedBlocks.remove(blockNum);
-        }
-        else{
-            if(block.isDisposed()){
-                bufManager.invalidateBlock(block);
-                return;
-            }
-            int numOfBlocks = getNumOfBlocks();
-            updateNumOfBlocks(++numOfBlocks);
-            block.setBlockNum(numOfBlocks);
-        }
+        assert loadedBlocks.containsKey(blockNum);
+        loadedBlocks.remove(blockNum);
 
         if(block.isDirty()){
             block.writeToFile();
@@ -167,30 +151,36 @@ public final class BlockFile {
 
         int blockNum = block.getBlockNum();
 
-        assert blockNum > 0 || blockNum == -1;
+        //TODO: assert blockNum > 0 || blockNum == -1;
 
         byte active = block.getByte(ACTIVE_BLOCK_OFFSET);
 
         if(active != ACTIVE_BLOCK)
             throw new InvalidBlockExcepxtion("Trying to dispose a free block");
 
-        if(blockNum != -1){
-            assert loadedBlocks.containsKey(blockNum);
-            updateFreeListHead(block);
-            System.out.println(block.isDirty());
-        }
+        assert loadedBlocks.containsKey(blockNum);
+        updateFreeListHead(loadBlock(0), block);
 
         block.setDisposed(true);
 
     }
 
     public Block allocateNewBlock() throws IOException {
-        Block rv = popFreeListHead();
+        Block header = loadBlock(0);
+        Block rv = popFreeListHead(header);
+        boolean newBlock = false;
 
         if(rv == null){
-           rv = bufManager.getBlock(this, -1, true);
+            int numOfBlocks = getNumOfBlocks(header);
+            updateNumOfBlocks(header, ++numOfBlocks);
+            rv = bufManager.getBlock(this, numOfBlocks, true);
+            newBlock = true;
+            loadedBlocks.put(numOfBlocks, rv);
         }
         rv.putByte(ACTIVE_BLOCK_OFFSET, ACTIVE_BLOCK);
+
+        if(newBlock)
+            rv.writeToFile();
 
         return rv;
     }
@@ -199,8 +189,9 @@ public final class BlockFile {
     public String toString(){
         StringBuilder rv = new StringBuilder();
         try{
-            int numOfBlocks = getNumOfBlocks();
-            int freeListHead = getFreeListHead();
+            Block header = loadBlock(0);
+            int numOfBlocks = getNumOfBlocks(header);
+            int freeListHead = getFreeListHead(header);
             rv.append("Num of blocks = ").append(numOfBlocks + 1).append('\n');
             rv.append("Free List Head = ").append(freeListHead).append('\n');
             for(int i = 0; i <= numOfBlocks; ++i)

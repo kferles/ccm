@@ -25,11 +25,14 @@ public class Block {
 
     private boolean disposed = false;
 
-    public Block(int blockNum, ByteBuffer buffer, BlockFile bf){
+    private boolean newBlock;
+
+    public Block(int blockNum, ByteBuffer buffer, BlockFile bf, boolean newBlock){
         this.blockNum = blockNum;
         this.buffer = buffer;
         this.bf = bf;
         this.channel = bf.getChannel();
+        this.newBlock = newBlock;
     }
 
     public int getBlockNum() {
@@ -81,6 +84,10 @@ public class Block {
 
     public void setDisposed(boolean disposed) {
         this.disposed = disposed;
+    }
+
+    public boolean isNewBlock() {
+        return newBlock;
     }
 
     public void writeToFile() throws IOException {

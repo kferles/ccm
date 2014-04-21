@@ -1,5 +1,6 @@
 package xaction;
 
+import exception.InvalidBlockExcepxtion;
 import file.Block;
 import file.BlockFile;
 
@@ -43,7 +44,7 @@ public class Xaction {
         newBlocks.clear();
     }
 
-    public void commit() throws IOException {
+    public void commit() throws IOException, InvalidBlockExcepxtion {
         List<Block> metadataBlocks = new ArrayList<>();
         for(Block b : newBlocks){
             BlockFile bf = b.getBlockFile();

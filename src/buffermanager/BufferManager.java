@@ -1,6 +1,7 @@
 package buffermanager;
 
 import config.ConfigParameters;
+import exception.InvalidBlockExcepxtion;
 import file.Block;
 import file.BlockFile;
 import util.Pair;
@@ -100,7 +101,7 @@ public class BufferManager {
 
         if(!newBlock)
             channel.read(buff, number*bufferSize);
-        Block rv = new Block(number, buff, bf);
+        Block rv = new Block(number, buff, bf, newBlock);
 
         currXaction.addBlock(rv);
 
@@ -111,7 +112,6 @@ public class BufferManager {
         FileChannel channel = block.getChannel();
         Integer num = block.getBlockNum();
 
-        assert num != -1;
         assert !block.isDirty();
 
         if(!cleanBlocks.containsKey(channel)){
@@ -126,7 +126,7 @@ public class BufferManager {
         notify();
     }
 
-    public synchronized void invalidateBlock(Block block){
+    public synchronized void invalidateBlock(Block block) throws IOException, InvalidBlockExcepxtion {
 
         FileChannel channel = block.getChannel();
         Integer num = block.getBlockNum();
@@ -137,6 +137,14 @@ public class BufferManager {
                 blocks.remove(num);
                 victimizePool.remove(new Pair<>(channel, num));
             }
+        }
+
+        if(block.isNewBlock() && !block.isDisposed()){
+            BlockFile bf = block.getBlockFile();
+            bf.disposeBlock(block);
+            block.writeToFile();
+            Block metadataBlock = bf.loadBlock(0);
+            metadataBlock.writeToFile();
         }
 
         availableBuffers.add(block.getBuffer());

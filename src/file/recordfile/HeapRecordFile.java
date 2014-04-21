@@ -9,6 +9,8 @@ import file.record.SerializableRecord;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
 import static util.FileSystemMethods.exists;
 import static util.FileSystemMethods.getPath;
@@ -170,6 +172,38 @@ public class HeapRecordFile<R extends SerializableRecord> {
         }
 
         return recFactory.fromByteArray(rec);
+    }
+
+    @Override
+    public String toString(){
+        StringBuilder rv = new StringBuilder();
+        List<RecordPointer> freeList = new ArrayList<>();
+        try {
+            Block header = blockFile.loadBlock(0);
+            RecordPointer curr = getFreeListHead(header);
+            while(curr.getBlockNum() != -1){
+                freeList.add(curr);
+                Block nextBlock = blockFile.loadBlock(curr.getBlockNum());
+                curr = getRecPtr(nextBlock, curr.getBlockOffset());
+            }
+            rv.append("Free List ").append(freeList.toString()).append('\n');
+
+            for(int i = 0, numOfBlocks = blockFile.getNumOfBlocks(); i < numOfBlocks; ++i){
+                rv.append("Block-").append(i+1).append("{\n");
+                RecordPointer ptr = new RecordPointer(i+1, -1);
+                for(int j = 0; j < recordsPerBlock; ++j){
+                    ptr.setBlockOffset(j);
+                    if(!freeList.contains(ptr)){
+                        rv.append(getRecord(ptr).toString()).append("\n");
+                    }
+                }
+                rv.append("}\n");
+            }
+        } catch (IOException | InvalidRecordSize e) {
+            rv.append(e.getMessage());
+        }
+
+        return rv.toString();
     }
 
 }

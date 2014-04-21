@@ -43,6 +43,9 @@ public final class BlockFile {
 
     private Map<Integer, Block> loadedBlocks = new HashMap<>();
 
+    //This is only for debugging.
+    private int numOfBlocks;
+
     private void initializeMetadata() throws IOException {
         Block header = new Block(0, ByteBuffer.allocateDirect(bufferSize), this, false);
         header.putInt(NUM_OF_BLOCKS_OFFSET, 0);
@@ -52,7 +55,9 @@ public final class BlockFile {
     }
 
     private int getNumOfBlocks(Block header) throws IOException {
-        return header.getInt(NUM_OF_BLOCKS_OFFSET);
+        int rv = header.getInt(NUM_OF_BLOCKS_OFFSET);
+        assert rv == numOfBlocks;
+        return rv;
     }
 
     private int getFreeListHead(Block header) throws IOException {
@@ -100,6 +105,11 @@ public final class BlockFile {
 
         if(initialize)
             initializeMetadata();
+        else{
+            ByteBuffer buff = ByteBuffer.allocateDirect(bufferSize);
+            this.channel.read(buff, 0);
+            numOfBlocks = buff.getInt(NUM_OF_BLOCKS_OFFSET);
+        }
     }
 
     public void close() throws IOException {
@@ -113,7 +123,7 @@ public final class BlockFile {
 
     public Block loadBlock(int num) throws IOException {
 
-        //TODO: insert a numOfBlocks variable for -> assert num == 0 || num <= getNumOfBlocks();
+        assert num <= numOfBlocks;
 
         if(loadedBlocks.containsKey(num)){
             Block rv = loadedBlocks.get(num);
@@ -151,7 +161,7 @@ public final class BlockFile {
 
         int blockNum = block.getBlockNum();
 
-        //TODO: assert blockNum > 0 || blockNum == -1;
+        assert blockNum > 0 && blockNum <= numOfBlocks;
 
         byte active = block.getByte(ACTIVE_BLOCK_OFFSET);
 
@@ -173,6 +183,9 @@ public final class BlockFile {
         if(rv == null){
             int numOfBlocks = getNumOfBlocks(header);
             updateNumOfBlocks(header, ++numOfBlocks);
+
+            this.numOfBlocks = numOfBlocks;
+
             rv = bufManager.getBlock(this, numOfBlocks, true);
             newBlock = true;
             loadedBlocks.put(numOfBlocks, rv);

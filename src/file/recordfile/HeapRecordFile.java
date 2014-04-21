@@ -4,16 +4,16 @@ import config.ConfigParameters;
 import exception.InvalidRecordSize;
 import file.blockfile.Block;
 import file.blockfile.BlockFile;
+import file.record.RecordFactory;
+import file.record.SerializableRecord;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Path;
 
 import static util.FileSystemMethods.exists;
 import static util.FileSystemMethods.getPath;
 
-public class HeapRecordFile {
+public class HeapRecordFile<R extends SerializableRecord> {
 
     private static final int bufferSize = ConfigParameters.getInstance().getBufferSize();
 
@@ -24,6 +24,8 @@ public class HeapRecordFile {
     private static final int FREE_LIST_BLOCK_OFFSET = RECORD_SIZE_OFFSET + 4;
 
     private static final int FREE_LIST_REC_OFFSET = FREE_LIST_BLOCK_OFFSET + 4;
+
+    private RecordFactory<R> recFactory;
 
     private BlockFile blockFile;
 
@@ -93,36 +95,38 @@ public class HeapRecordFile {
         return newBlock;
     }
 
-    public HeapRecordFile(String filename, int recordSize) throws IOException, InvalidRecordSize {
+    public HeapRecordFile(String filename, RecordFactory<R> recFactory) throws IOException, InvalidRecordSize {
         Path p = getPath(filename);
 
-        if(exists(p))
-            throw new FileAlreadyExistsException("Error " + filename + " already exists");
-
+        this.recFactory = recFactory;
         blockFile = new BlockFile(filename);
 
-        assert recordSize >= 8;
-        if(recordSize < 8)
-            throw new InvalidRecordSize("Records must be at least four bytes");
+        if(!exists(p)){
+            recordSize = recFactory.size();
+            assert recordSize >= 8;
+            if(recordSize < 8)
+                throw new InvalidRecordSize("Records must be at least four bytes");
 
-        this.recordSize = recordSize;
-        this.recordsPerBlock = (bufferSize - BlockFile.BLOCK_METADATA_SIZE)/recordSize;
-        initializeMetadata();
+            this.recordsPerBlock = (bufferSize - BlockFile.BLOCK_METADATA_SIZE)/recordSize;
+            initializeMetadata();
+        }
+        else{
+            Block header = blockFile.loadBlock(0);
+
+            this.recordSize = header.getInt(RECORD_SIZE_OFFSET);
+
+            if(recFactory.size() != recordSize)
+                throw new InvalidRecordSize("Size in heap file " + filename
+                                            + " does not match size of given class");
+
+            this.recordsPerBlock = (bufferSize - BlockFile.BLOCK_METADATA_SIZE)/recordSize;
+        }
     }
 
-    public HeapRecordFile(String filename) throws IOException {
-        Path p = getPath(filename);
+    public void insertRecord(R record) throws IOException {
 
-        if(!exists(p))
-            throw new FileNotFoundException("file: " + filename + " does not exist");
+        byte[] rec = record.toByteArray();
 
-        Block header = blockFile.loadBlock(0);
-
-        this.recordSize = header.getInt(RECORD_SIZE_OFFSET);
-        this.recordsPerBlock = (bufferSize - BlockFile.BLOCK_METADATA_SIZE)/recordSize;
-    }
-
-    public void insertRecord(byte[] rec) throws IOException {
         assert rec.length == recordSize;
 
         Block header = blockFile.loadBlock(0);
@@ -155,6 +159,17 @@ public class HeapRecordFile {
         updateRecPtr(deleteFrom, recPtr.getBlockOffset(), freeListHead);
 
         updateFreeListHead(header, recPtr);
+    }
+
+    public R getRecord(RecordPointer recPtr) throws IOException, InvalidRecordSize {
+        Block block = blockFile.loadBlock(recPtr.getBlockNum());
+        byte[] rec = new byte[recordSize];
+        int recIndex = recPtr.getBlockOffset();
+        for(int i = 0; i < recordSize; ++i){
+            rec[i] = block.getByte(FIRST_RECORD_OFFSET + recIndex*recordSize + i);
+        }
+
+        return recFactory.fromByteArray(rec);
     }
 
 }

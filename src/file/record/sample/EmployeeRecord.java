@@ -22,11 +22,11 @@ public class EmployeeRecord implements SerializableRecord {
     private char[] lastName = new char[LAST_NAME_LENGTH];
 
     private byte[] idToByteArray(){
-        return ByteBuffer.allocateDirect(4).putInt(id).array();
+        return ByteBuffer.allocate(4).putInt(id).array();
     }
 
     private byte[] charArrayToByteArray(char[] src){
-        ByteBuffer buff = ByteBuffer.allocateDirect(2*src.length);
+        ByteBuffer buff = ByteBuffer.allocate(2 * src.length);
         buff.asCharBuffer().put(src);
         return buff.array();
     }
@@ -41,7 +41,7 @@ public class EmployeeRecord implements SerializableRecord {
         int strLength = src.length();
         for(int i = 0; i < strLength; ++i)
             if(i < strLength)
-                dest[i] = src.charAt(0);
+                dest[i] = src.charAt(i);
             else
                 dest[i] = '\0';
     }
@@ -92,7 +92,10 @@ public class EmployeeRecord implements SerializableRecord {
 
         moveFromByteArray(rv, 0, idToByteArray());
         moveFromByteArray(rv, 4, charArrayToByteArray(firstName));
-        moveFromByteArray(rv, 4 + FIRST_NAME_LENGTH, charArrayToByteArray(lastName));
+        //WARNING: here it is crucial to multiply FIRST_NAME_LENGTH with 2
+        //         otherwise first and last names fields get mixed during
+        //         de-serialization.
+        moveFromByteArray(rv, 4 + 2*FIRST_NAME_LENGTH, charArrayToByteArray(lastName));
         return rv;
     }
 

@@ -94,7 +94,7 @@ public class HeapRecordFile<R extends SerializableRecord> {
         RecordPointer freeList = getFreeListHead(header);
         updateRecPtr(newBlock, i, freeList);
 
-        freeList = new RecordPointer(newBlock.getBlockNum(), FIRST_RECORD_OFFSET);
+        freeList = new RecordPointer(newBlock.getBlockNum(), 0);
         updateFreeListHead(header, freeList);
         return newBlock;
     }
@@ -144,8 +144,8 @@ public class HeapRecordFile<R extends SerializableRecord> {
         RecordPointer insertPtr;
 
         if(freeListHead.getBlockNum() == -1){
-            Block newBlock = allocateNewBlock();
-            insertPtr = new RecordPointer(newBlock.getBlockNum(), FIRST_RECORD_OFFSET);
+            allocateNewBlock();
+            insertPtr = getFreeListHead(header);
         }
         else{
             insertPtr = freeListHead;
@@ -158,7 +158,7 @@ public class HeapRecordFile<R extends SerializableRecord> {
         updateFreeListHead(header, newFreeListHead);
 
         for(int i = 0; i < recordSize; ++i)
-            toInsert.putByte(recOffset + i, rec[i]);
+            toInsert.putByte(FIRST_RECORD_OFFSET + recOffset*recordSize + i, rec[i]);
 
         return insertPtr;
     }
@@ -190,6 +190,8 @@ public class HeapRecordFile<R extends SerializableRecord> {
         List<RecordPointer> freeList = new ArrayList<>();
         try {
             Block header = blockFile.loadBlock(0);
+            rv.append("Records per block ").append(recordsPerBlock).append('\n');
+            rv.append("Record size ").append(recordSize).append('\n');
             RecordPointer curr = getFreeListHead(header);
             while(curr.getBlockNum() != -1){
                 freeList.add(curr);
@@ -204,7 +206,7 @@ public class HeapRecordFile<R extends SerializableRecord> {
                 for(int j = 0; j < recordsPerBlock; ++j){
                     ptr.setBlockOffset(j);
                     if(!freeList.contains(ptr)){
-                        rv.append(getRecord(ptr).toString()).append("\n");
+                        rv.append(j).append(':').append(getRecord(ptr).toString()).append("\n");
                     }
                 }
                 rv.append("}\n");

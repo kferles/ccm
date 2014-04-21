@@ -8,6 +8,7 @@ import file.record.RecordFactory;
 import file.record.SerializableRecord;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -36,8 +37,9 @@ public class HeapRecordFile<R extends SerializableRecord> {
     private final int recordsPerBlock;
 
     private void initializeMetadata() throws IOException {
-        Block header = blockFile.loadBlock(0);
-
+        ByteBuffer buff = ByteBuffer.allocateDirect(bufferSize);
+        blockFile.getChannel().read(buff, 0);
+        Block header = new Block(0, buff, this.blockFile, false);
         header.putInt(RECORD_SIZE_OFFSET, recordSize);
         header.putInt(FREE_LIST_BLOCK_OFFSET, -1);
         header.putInt(FREE_LIST_REC_OFFSET, -1);
@@ -99,11 +101,15 @@ public class HeapRecordFile<R extends SerializableRecord> {
 
     public HeapRecordFile(String filename, RecordFactory<R> recFactory) throws IOException, InvalidRecordSize {
         Path p = getPath(filename);
+        boolean initialize = false;
+
+        if(!exists(p))
+            initialize = true;
 
         this.recFactory = recFactory;
         blockFile = new BlockFile(filename);
 
-        if(!exists(p)){
+        if(initialize){
             recordSize = recFactory.size();
             assert recordSize >= 8;
             if(recordSize < 8)
@@ -113,7 +119,9 @@ public class HeapRecordFile<R extends SerializableRecord> {
             initializeMetadata();
         }
         else{
-            Block header = blockFile.loadBlock(0);
+            ByteBuffer buff = ByteBuffer.allocateDirect(bufferSize);
+            blockFile.getChannel().read(buff, 0);
+            Block header = new Block(0, buff, this.blockFile, false);
 
             this.recordSize = header.getInt(RECORD_SIZE_OFFSET);
 

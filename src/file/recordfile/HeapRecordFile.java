@@ -85,9 +85,11 @@ public class HeapRecordFile<R extends SerializableRecord> {
     private Block allocateNewBlock() throws IOException {
         Block newBlock = blockFile.allocateNewBlock();
 
-        int i;
-        for(i = 0; i < recordsPerBlock - 1; i++){
-            updateRecPtr(newBlock, i, i + 1);
+        int i = 0;
+        if(recordsPerBlock > 1){
+            for(i = 0; i < recordsPerBlock - 1; i++){
+                updateRecPtr(newBlock, i, i + 1);
+            }
         }
 
         Block header = blockFile.loadBlock(0);
@@ -131,6 +133,7 @@ public class HeapRecordFile<R extends SerializableRecord> {
 
             this.recordsPerBlock = (bufferSize - BlockFile.BLOCK_METADATA_SIZE)/recordSize;
         }
+        assert recordsPerBlock >= 1;
     }
 
     public RecordPointer insertRecord(R record) throws IOException {

@@ -114,11 +114,6 @@ public class EmployeeRecord implements SerializableRecord,
     }
 
     @Override
-    public byte[] keyToByteArray() {
-        return idToByteArray();
-    }
-
-    @Override
     public int compareTo(EmployeeRecord o) {
         return Integer.compare(this.id, o.id);
     }

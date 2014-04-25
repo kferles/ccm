@@ -15,6 +15,11 @@ public class EmployeeKeyValFactory implements KeyValueFactory<Integer> {
     }
 
     @Override
+    public byte[] toByteArray(Integer key) {
+        return ByteBuffer.allocate(4).putInt(key).array();
+    }
+
+    @Override
     public int keySize() {
         return 4;
     }

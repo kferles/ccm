@@ -104,19 +104,20 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord> {
 
         private void shiftKeysAndPointers(int fromIndex){
             int numOfPointers = getNumOfPointers();
+            setNumOfPointers(++numOfPointers);
 
             assert fromIndex <  numOfPointers - 1;
 
             //shifting keys
-            for(int i = numOfPointers - 2; i >= fromIndex; --i){
+            for(int i = numOfPointers - 3; i >= fromIndex; --i){
                 K curr = getKey(i);
                 setKey(i+1, curr);
             }
 
             //shifting pointers
-            for(int i = numOfPointers - 1; i >= fromIndex + 1; --i){
+            for(int i = numOfPointers - 2; i >= fromIndex + 1; --i){
                 int currPtr = getPointer(i);
-                setPointer(i, currPtr);
+                setPointer(i + 1, currPtr);
             }
         }
 
@@ -213,11 +214,10 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord> {
             assert !isFull();
 
             int insertPosition = nextPointer(key);
-
             shiftKeysAndPointers(insertPosition);
 
             setKey(insertPosition, key);
-            setPointer(insertPosition, gtePointer);
+            setPointer(insertPosition + 1, gtePointer);
         }
 
         public K splitNode(K newKey, int gtePtr, InnerNode newInnerNode){
@@ -232,23 +232,25 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord> {
                 keys.add(new Pair<>(getKey(i), getPointer(i+1)));
             }
 
+            if(insertPosition == pointersPerInnerNode - 1)
+                keys.add(new Pair<>(newKey, gtePtr));
+
             assert keys.size() == pointersPerInnerNode;
 
             int splitPosition = pointersPerInnerNode >>> 1;
 
             setNumOfPointers(splitPosition);
-
-            for(int i = 0; i < splitPosition; ++i){
-                Pair<K, Integer> currKey = keys.get(i);
-                setKey(i, currKey.first);
-                setPointer(i+1, currKey.second);
+            if(insertPosition < splitPosition){
+                shiftKeysAndPointers(insertPosition);
+                setKey(insertPosition, newKey);
+                setPointer(insertPosition + 1, gtePtr);
             }
 
-            Pair<K, Integer> median = keys.get(splitPosition);
+            Pair<K, Integer> median = keys.get(splitPosition - 1);
             newInnerNode.setNumOfPointers(1);
             newInnerNode.setPointer(0, median.second);
 
-            for(int i = splitPosition + 1, newInnerIdx = 0; i < pointersPerInnerNode; ++i, ++newInnerIdx){
+            for(int i = splitPosition, newInnerIdx = 0; i < pointersPerInnerNode; ++i, ++newInnerIdx){
                 Pair<K, Integer> key = keys.get(i);
                 newInnerNode.setNumOfPointers(newInnerIdx + 2);
                 newInnerNode.setKey(newInnerIdx, key.first);
@@ -413,7 +415,6 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord> {
             assert isFull();
 
             int insertPosition = findInsertPosition(key);
-
             int splitPosition = (pointersPerLeafNode + 1) >>> 1;
 
             List<Pair<RecordPointer, K>> allRecs = new ArrayList<>();
@@ -424,6 +425,9 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord> {
                 allRecs.add(getPointer(i));
             }
 
+            if(insertPosition == pointersPerLeafNode)
+                allRecs.add(new Pair<>(recPtr, key));
+
             setNumOfPointers(splitPosition);
 
             if(insertPosition < splitPosition){
@@ -432,8 +436,8 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord> {
             }
 
             K rv = null;
-            newLeafNode.setNumOfPointers(pointersPerLeafNode - splitPosition);
-            for(int i = 0; i < pointersPerLeafNode - splitPosition; ++i){
+            newLeafNode.setNumOfPointers(allRecs.size() - splitPosition);
+            for(int i = 0; i < allRecs.size() - splitPosition; ++i){
                 Pair<RecordPointer, K> ptr = allRecs.get(splitPosition + i);
                 if(i == 0)
                     rv = ptr.second;
@@ -449,6 +453,30 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord> {
 
         public int getBlockNum(){
             return this.block.getBlockNum();
+        }
+
+        public RecordPointer findKey(K key){
+            int numOfPointers = getNumOfPointers();
+
+            assert numOfPointers > 0;
+
+            int imin = 0, imax = numOfPointers - 1;
+
+            while(imax >= imin){
+
+                int imid = (imin + imax) >>> 1;
+                Pair<RecordPointer, K> midKey = getPointer(imid);
+                int cmpRes = key.compareTo(midKey.second);
+
+                if(cmpRes == 0)
+                    return midKey.first;
+                if(cmpRes < 0)
+                    imax = imid - 1;
+                else
+                    imin = imid + 1;
+            }
+
+            return null;
         }
 
         @Override
@@ -493,7 +521,7 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord> {
             if(pathFromRoot != null)
                 pathFromRoot.add(innerCurr);
 
-            int nextPtr = innerCurr.nextPointer(key);
+            int nextPtr = innerCurr.getPointer(innerCurr.nextPointer(key));
             curr = indexFile.loadBlock(nextPtr);
         }
 
@@ -536,6 +564,16 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord> {
             initializeMetadata();
         else
             loadMetadata(filename);
+    }
+
+    public R get(K key) throws IOException, InvalidRecordSize {
+        Block header = indexFile.loadBlock(0);
+        int rootBlockNum = getRootBlock(header);
+        if(rootBlockNum == -1)
+            return null;
+        LeafNode leaf = findLeafNodeForKey(indexFile.loadBlock(rootBlockNum), key, null);
+        RecordPointer heapPtr = leaf.findKey(key);
+        return heapPtr != null ? recordFile.getRecord(heapPtr) : null;
     }
 
     public void insert(K key, R record) throws IOException {
@@ -651,8 +689,6 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord> {
             else{
                 rv.append("Empty tree");
             }
-
-            rv.append("\nRecord File:\n").append(recordFile.toString());
 
         } catch (IOException e) {
             rv.append(e.getMessage());

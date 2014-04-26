@@ -46,6 +46,7 @@ public final class BlockFile {
     //This is only for debugging.
     private int numOfBlocks;
 
+    //TODO: add blockSize in metadata (only if there is enough time)
     private void initializeMetadata() throws IOException {
         Block header = new Block(0, ByteBuffer.allocateDirect(bufferSize), this, false);
         header.putInt(NUM_OF_BLOCKS_OFFSET, 0);

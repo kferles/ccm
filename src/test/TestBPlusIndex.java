@@ -37,9 +37,9 @@ public class TestBPlusIndex {
 
         t1.begin();
         for(int i = 0; i < 11; ++i)
-            bPlusIndex.insert(new EmployeeRecord(currId++, "Kostas", "Ferles"));
+            bPlusIndex.insert(currId++, new EmployeeRecord(currId-1, "Kostas", "Ferles"));
         //Checking leaf split
-        bPlusIndex.insert(new EmployeeRecord(currId, "Kostas", "Ferles"));
+        bPlusIndex.insert(currId, new EmployeeRecord(currId, "Kostas", "Ferles"));
         System.out.println(bPlusIndex.toString());
         t1.commit();
         t1.end();
@@ -50,12 +50,12 @@ public class TestBPlusIndex {
         t1.begin();
         //Checking key shifting
         for(int i = 0; i < 10; i += 2, currId += 2)
-            bPlusIndex.insert(new EmployeeRecord(currId, "Kostas", "Ferles"));
+            bPlusIndex.insert(currId, new EmployeeRecord(currId, "Kostas", "Ferles"));
         currId = 2;
         for(int i = 1; i < 10; i += 2, currId += 2)
-            bPlusIndex.insert(new EmployeeRecord(currId, "Kostas", "Ferles"));
+            bPlusIndex.insert(currId, new EmployeeRecord(currId, "Kostas", "Ferles"));
         //shift it all the way
-        bPlusIndex.insert(new EmployeeRecord(0, "Kostas", "Ferles"));
+        bPlusIndex.insert(0, new EmployeeRecord(0, "Kostas", "Ferles"));
         System.out.println(bPlusIndex.toString());
         t1.commit();
         t1.end();

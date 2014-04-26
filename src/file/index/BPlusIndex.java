@@ -5,7 +5,6 @@ import exception.InvalidKeyFactoryException;
 import exception.InvalidRecordSize;
 import file.blockfile.Block;
 import file.blockfile.BlockFile;
-import file.record.IdentifiableRecord;
 import file.record.KeyValueFactory;
 import file.record.RecordFactory;
 import file.record.SerializableRecord;
@@ -25,8 +24,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
-public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
-                                                           IdentifiableRecord<K>> {
+public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord> {
 
     private static final int BUFFER_SIZE = ConfigParameters.getInstance().getBufferSize();
 
@@ -540,7 +538,7 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
             loadMetadata(filename);
     }
 
-    public void insert(R record) throws IOException {
+    public void insert(K key, R record) throws IOException {
         Block header = indexFile.loadBlock(0);
 
         int rootBlockNum = getRootBlock(header);
@@ -561,8 +559,6 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
         }
 
         List<InnerNode> pathFromRoot = new ArrayList<>();
-
-        K key = record.getKeyValue();
 
         LeafNode insertLeaf = findLeafNodeForKey(root, key, pathFromRoot);
 

@@ -1,13 +1,11 @@
 package file.record.sample;
 
 import exception.InvalidRecordSize;
-import file.record.IdentifiableRecord;
 import file.record.SerializableRecord;
 
 import java.nio.ByteBuffer;
 
 public class EmployeeRecord implements SerializableRecord,
-                                       IdentifiableRecord<Integer>,
                                        Comparable<EmployeeRecord>{
 
     static final int FIRST_NAME_LENGTH = 30;
@@ -106,11 +104,6 @@ public class EmployeeRecord implements SerializableRecord,
     public String toString(){
         return "[" + id + ", " + new String(firstName) + ", "
                    + new String(lastName) + "]";
-    }
-
-    @Override
-    public Integer getKeyValue() {
-        return this.id;
     }
 
     @Override

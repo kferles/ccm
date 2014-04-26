@@ -333,7 +333,7 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
 
                 }
                 else{
-                    assert imid < numOfPointers - 2;
+                    assert imid < numOfPointers - 1;
 
                     Pair<RecordPointer, K> nextMid = getPointer(imid + 1);
                     if(key.compareTo(nextMid.second) < 0)
@@ -426,11 +426,12 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
                 allRecs.add(getPointer(i));
             }
 
+            setNumOfPointers(splitPosition);
+
             if(insertPosition < splitPosition){
+                shiftKeysAndPointers(insertPosition);
                 setPointer(insertPosition, key, recPtr);
             }
-
-            setNumOfPointers(splitPosition);
 
             K rv = null;
             newLeafNode.setNumOfPointers(pointersPerLeafNode - splitPosition);
@@ -655,7 +656,7 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
                 rv.append("Empty tree");
             }
 
-            rv.append('\n').append(recordFile.toString());
+            rv.append("\nRecord File:\n").append(recordFile.toString());
 
         } catch (IOException e) {
             rv.append(e.getMessage());

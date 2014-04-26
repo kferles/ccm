@@ -1,5 +1,6 @@
 package test;
 
+import config.ConfigParameters;
 import exception.InvalidBlockExcepxtion;
 import exception.InvalidKeyFactoryException;
 import exception.InvalidRecordSize;
@@ -18,11 +19,15 @@ public class TestBplusIndex {
 
     public static void main(String[] args) throws IOException, InvalidRecordSize, InvalidBlockExcepxtion, InvalidKeyFactoryException {
 
+        //Making buffer size very small, only one record fits in a buffer.
+        ConfigParameters.getInstance().setBufferSize(150);
         String fileName = "test_file";
         Path p = FileSystemMethods.getPath(fileName);
         Files.deleteIfExists(p);
 
-        BPlusIndex<Integer, EmployeeRecord> bPlusIndex = new BPlusIndex<>(fileName, true, new EmployeeFactory(), new EmployeeKeyValFactory());
+        EmployeeFactory employeeFactory = new EmployeeFactory();
+        EmployeeKeyValFactory employeeKeyValFactory = new EmployeeKeyValFactory();
+        BPlusIndex<Integer, EmployeeRecord> bPlusIndex = new BPlusIndex<>(fileName, true, employeeFactory, employeeKeyValFactory);
         int currId = 0;
         Xaction t1 = new Xaction();
         t1.begin();
@@ -31,11 +36,26 @@ public class TestBplusIndex {
         t1.end();
 
         t1.begin();
-        for(int i = 0; i < 11; ++i){
-            System.out.println(i);
+        for(int i = 0; i < 11; ++i)
             bPlusIndex.insert(new EmployeeRecord(currId++, "Kostas", "Ferles"));
-        }
-        bPlusIndex.insert(new EmployeeRecord(currId++, "Kostas", "Ferles"));
+        //Checking leaf split
+        bPlusIndex.insert(new EmployeeRecord(currId, "Kostas", "Ferles"));
+        System.out.println(bPlusIndex.toString());
+        t1.commit();
+        t1.end();
+
+        Files.delete(p);
+        currId = 1;
+        bPlusIndex = new BPlusIndex<>(fileName, true, employeeFactory, employeeKeyValFactory);
+        t1.begin();
+        //Checking key shifting
+        for(int i = 0; i < 10; i += 2, currId += 2)
+            bPlusIndex.insert(new EmployeeRecord(currId, "Kostas", "Ferles"));
+        currId = 2;
+        for(int i = 1; i < 10; i += 2, currId += 2)
+            bPlusIndex.insert(new EmployeeRecord(currId, "Kostas", "Ferles"));
+        //shift it all the way
+        bPlusIndex.insert(new EmployeeRecord(0, "Kostas", "Ferles"));
         System.out.println(bPlusIndex.toString());
         t1.commit();
         t1.end();

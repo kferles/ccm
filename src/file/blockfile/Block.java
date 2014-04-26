@@ -13,13 +13,13 @@ public class Block {
 
     private static final int bufferSize = ConfigParameters.getInstance().getBufferSize();
 
-    private BlockFile bf;
+    private final BlockFile bf;
 
-    private FileChannel channel;
+    private final FileChannel channel;
 
     private int blockNum;
 
-    private ByteBuffer buffer;
+    private final ByteBuffer buffer;
 
     private boolean dirty = false;
 

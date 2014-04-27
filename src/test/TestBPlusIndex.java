@@ -1,5 +1,6 @@
 package test;
 
+import buffermanager.BufferManager;
 import config.ConfigParameters;
 import exception.InvalidBlockExcepxtion;
 import exception.InvalidKeyFactoryException;
@@ -20,6 +21,8 @@ public class TestBPlusIndex {
 
     public static void main(String[] args) throws IOException, InvalidRecordSize, InvalidBlockExcepxtion, InvalidKeyFactoryException {
 
+        //Temporary solution until I'll find the 'victimize pool' bug
+        ConfigParameters.getInstance().setMaxBuffNumber(400);
         //Making buffer size very small, only one record fits in a buffer.
         ConfigParameters.getInstance().setBufferSize(150);
         String fileName = "test_file";
@@ -46,8 +49,33 @@ public class TestBPlusIndex {
         t1.commit();
         t1.end();
 
+        System.out.println("Testing leaf spleat with various insert positions...");
+        for(int j = 0, newInsPos = 0; j < 12; ++j, newInsPos += 2){
+            Files.delete(p);
+            currId = 1;
+            BufferManager.getInstance().reset();
+            bPlusIndex = new BPlusIndex<>(fileName, true, employeeFactory, employeeKeyValFactory);
+            t1.begin();
+            for(int i = 0; i < 11; ++i, currId += 2){
+                bPlusIndex.insert(currId, new EmployeeRecord(currId, "Kostas", "Ferles"));
+            }
+            t1.commit();
+            t1.end();
+
+            t1.begin();
+            bPlusIndex.insert(newInsPos, new EmployeeRecord(newInsPos, "Kostas", "Ferles"));
+            t1.commit();
+            t1.end();
+
+            t1.begin();
+            System.out.println(bPlusIndex.toString());
+            t1.commit();
+            t1.end();
+        }
+
         Files.delete(p);
         currId = 1;
+        BufferManager.getInstance().reset();
         bPlusIndex = new BPlusIndex<>(fileName, true, employeeFactory, employeeKeyValFactory);
         System.out.println("Testing key shifting");
         t1.begin();
@@ -98,6 +126,7 @@ public class TestBPlusIndex {
 
         currId = 0;
         Files.delete(p);
+        BufferManager.getInstance().reset();
         bPlusIndex = new BPlusIndex<>(fileName, true, employeeFactory, employeeKeyValFactory);
         System.out.println("Testing Shifting Keys in Inner nodes.");
         System.out.println("Initial phase");
@@ -157,13 +186,13 @@ public class TestBPlusIndex {
         t1.end();
 
         Files.delete(p);
+        BufferManager.getInstance().reset();
         bPlusIndex = new BPlusIndex<>(fileName, true, employeeFactory, employeeKeyValFactory);
         Set<Integer> newIds = new HashSet<>();
         System.out.println("Stress test...");
 
         for(int i = 0; i < 300; ++i){
             t1.begin();
-            System.out.println(i);
             int id = r.nextInt();
             while(bPlusIndex.get(id) != null)
                 id = r.nextInt();

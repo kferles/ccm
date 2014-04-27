@@ -45,7 +45,7 @@ public class BufferManager {
     }
 
     private ByteBuffer victimize(){
-        Pair<FileChannel, Integer> victim = victimizePool.remove(victimizePool.size() - 1);
+        Pair<FileChannel, Integer> victim = victimizePool.remove(0);
         Map<Integer, Block> blocks = cleanBlocks.get(victim.first);
         return blocks.remove(victim.second).getBuffer();
     }
@@ -121,7 +121,10 @@ public class BufferManager {
         Map<Integer, Block> blocks = cleanBlocks.get(channel);
         blocks.put(num, block);
 
-        victimizePool.add(0, new Pair<>(channel, num));
+        Pair<FileChannel, Integer> entry = new Pair<>(channel, num);
+        if(!victimizePool.contains(entry)) {
+            victimizePool.add(entry);
+        }
 
         notify();
     }
@@ -150,5 +153,16 @@ public class BufferManager {
         availableBuffers.add(block.getBuffer());
 
         notify();
+    }
+
+    //Solely for testing
+    public synchronized void reset(){
+        this.cleanBlocks = new HashMap<>();
+        this.victimizePool = new ArrayList<>();
+        int maxBuffNum = config.getMaxBuffNumber();
+        this.availableBuffers = new ArrayList<>();
+        for(int i = 0; i < maxBuffNum; i++){
+            availableBuffers.add(ByteBuffer.allocateDirect(bufferSize));
+        }
     }
 }

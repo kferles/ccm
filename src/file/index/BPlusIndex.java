@@ -239,18 +239,20 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord> {
 
             int splitPosition = pointersPerInnerNode >>> 1;
 
-            setNumOfPointers(splitPosition);
-            if(insertPosition < splitPosition){
-                shiftKeysAndPointers(insertPosition);
-                setKey(insertPosition, newKey);
-                setPointer(insertPosition + 1, gtePtr);
+            setNumOfPointers(splitPosition + 1);
+            //This can be further optimized,
+            //but for the time I am gonna keep the slower way
+            for(int i = 0; i < splitPosition; ++i){
+                Pair<K, Integer> keyPtr = keys.get(i);
+                setKey(i, keyPtr.first);
+                setPointer(i+1, keyPtr.second);
             }
 
-            Pair<K, Integer> median = keys.get(splitPosition - 1);
+            Pair<K, Integer> median = keys.get(splitPosition);
             newInnerNode.setNumOfPointers(1);
             newInnerNode.setPointer(0, median.second);
 
-            for(int i = splitPosition, newInnerIdx = 0; i < pointersPerInnerNode; ++i, ++newInnerIdx){
+            for(int i = splitPosition + 1, newInnerIdx = 0; i < pointersPerInnerNode; ++i, ++newInnerIdx){
                 Pair<K, Integer> key = keys.get(i);
                 newInnerNode.setNumOfPointers(newInnerIdx + 2);
                 newInnerNode.setKey(newInnerIdx, key.first);
@@ -430,9 +432,11 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord> {
 
             setNumOfPointers(splitPosition);
 
-            if(insertPosition < splitPosition){
-                shiftKeysAndPointers(insertPosition);
-                setPointer(insertPosition, key, recPtr);
+            //This can be further optimized,
+            //but for the time I am gonna keep the slower way
+            for(int i = 0; i < splitPosition; ++i){
+                Pair<RecordPointer, K> rec = allRecs.get(i);
+                setPointer(i, rec.second, rec.first);
             }
 
             K rv = null;

@@ -516,7 +516,8 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord> {
         return header.getInt(ROOT_POINTER_OFFSET);
     }
 
-    private LeafNode findLeafNodeForKey(Block root, K key, List<InnerNode> pathFromRoot) throws IOException {
+    private LeafNode findLeafNodeForKey(Block root, K key,
+                                        List<InnerNode> pathFromRoot) throws IOException {
         Block curr = root;
         while(!isLeafNode(curr)){
             assert isInnerNode(curr);
@@ -534,7 +535,9 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord> {
 
     public BPlusIndex(String filename, boolean create,
                       RecordFactory<R> recFactory,
-                      KeyValueFactory<K> keyValFactory) throws IOException, InvalidRecordSize, InvalidKeyFactoryException {
+                      KeyValueFactory<K> keyValFactory) throws IOException,
+                                                               InvalidRecordSize,
+                                                               InvalidKeyFactoryException {
         Path recPath = getPath(filename);
         String indexFilename = filename + "_b_plus.idx";
         Path indexPath = getPath(indexFilename);
@@ -660,7 +663,8 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord> {
         StringBuilder rv = new StringBuilder();
 
         try {
-            rv.append("Inner Node Degree: ").append(pointersPerInnerNode).append("\nLeaf Node Capacity: ").append(pointersPerLeafNode).append('\n');
+            rv.append("Inner Node Degree: ").append(pointersPerInnerNode).
+               append("\nLeaf Node Capacity: ").append(pointersPerLeafNode).append('\n');
             Block header = indexFile.loadBlock(0);
             int rootBlock = getRootBlock(header);
 

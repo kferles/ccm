@@ -1,6 +1,7 @@
 package file.index;
 
 import config.ConfigParameters;
+import exception.InvalidBlockExcepxtion;
 import exception.InvalidKeyFactoryException;
 import exception.InvalidRecordSize;
 import file.blockfile.Block;
@@ -168,7 +169,7 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord> {
             return getNumOfPointers() == pointersPerInnerNode;
         }
 
-        public int nextPointer(K key){
+        public int nextPointersIndex(K key){
             int numOfPointers = getNumOfPointers();
 
             K first = getKey(0), last = getKey(numOfPointers - 2);
@@ -213,7 +214,7 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord> {
         public void insertKey(K key, int gtePointer){
             assert !isFull();
 
-            int insertPosition = nextPointer(key);
+            int insertPosition = nextPointersIndex(key);
             shiftKeysAndPointers(insertPosition);
 
             setKey(insertPosition, key);
@@ -223,7 +224,7 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord> {
         public K splitNode(K newKey, int gtePtr, InnerNode newInnerNode){
             assert isFull();
 
-            int insertPosition = nextPointer(newKey);
+            int insertPosition = nextPointersIndex(newKey);
             List<Pair<K, Integer>> keys = new ArrayList<>();
             for(int i = 0; i < pointersPerInnerNode - 1; ++i){
                 if(i == insertPosition)
@@ -260,6 +261,31 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord> {
             }
 
             return median.first;
+        }
+
+        public int findPointerOffset(int nodePtr){
+            int rv = -1;
+
+            final int numOfPointers = getNumOfPointers();
+            for(int i = 0; i < numOfPointers; ++i)
+                if(getPointer(i) == nodePtr)
+                    return i;
+
+            return rv;
+        }
+
+        public Pair<K, Integer> removeKeyAndGtPtr(int index){
+            final int numOfPointers = getNumOfPointers();
+            assert index >= 0 && index < numOfPointers - 1;
+            Pair<K, Integer> rv = new Pair<>(getKey(index), getPointer(index + 1));
+            //shifting keys and pointers to the left
+            for(int i = index; i < numOfPointers - 2; ++i){
+                setKey(i, getKey(i + 1));
+                setPointer(i + 1, getPointer(i + 2));
+            }
+
+            setNumOfPointers(numOfPointers - 1);
+            return rv;
         }
 
         public int getBlockNum(){
@@ -459,7 +485,7 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord> {
             return this.block.getBlockNum();
         }
 
-        public RecordPointer findKey(K key){
+        public Pair<RecordPointer, Integer> findKey(K key){
             int numOfPointers = getNumOfPointers();
 
             assert numOfPointers > 0;
@@ -473,7 +499,7 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord> {
                 int cmpRes = key.compareTo(midKey.second);
 
                 if(cmpRes == 0)
-                    return midKey.first;
+                    return new Pair<>(midKey.first, imid);
                 if(cmpRes < 0)
                     imax = imid - 1;
                 else
@@ -481,6 +507,21 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord> {
             }
 
             return null;
+        }
+
+        public Pair<RecordPointer, K> removeKey(int index){
+            int numOfPointers = getNumOfPointers();
+            assert index < numOfPointers;
+
+            Pair<RecordPointer, K> rv = getPointer(index);
+            for(int i = index; i < numOfPointers - 1; ++i){
+                Pair<RecordPointer, K> nextPtr = getPointer(i + 1);
+                setPointer(i, nextPtr.second, nextPtr.first);
+            }
+
+            setNumOfPointers(numOfPointers - 1);
+
+            return rv;
         }
 
         @Override
@@ -526,7 +567,7 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord> {
             if(pathFromRoot != null)
                 pathFromRoot.add(innerCurr);
 
-            int nextPtr = innerCurr.getPointer(innerCurr.nextPointer(key));
+            int nextPtr = innerCurr.getPointer(innerCurr.nextPointersIndex(key));
             curr = indexFile.loadBlock(nextPtr);
         }
 
@@ -579,8 +620,8 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord> {
         if(rootBlockNum == -1)
             return null;
         LeafNode leaf = findLeafNodeForKey(indexFile.loadBlock(rootBlockNum), key, null);
-        RecordPointer heapPtr = leaf.findKey(key);
-        return heapPtr != null ? recordFile.getRecord(heapPtr) : null;
+        Pair<RecordPointer, Integer> heapPtr = leaf.findKey(key);
+        return heapPtr != null ? recordFile.getRecord(heapPtr.first) : null;
     }
 
     public void insert(K key, R record) throws IOException {
@@ -656,6 +697,351 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord> {
                 header.putInt(ROOT_POINTER_OFFSET, newRoot.getBlockNum());
             }
         }
+    }
+
+    private int ceilOfHalf(int a){
+        return a/2 + a%2;
+    }
+
+    private int deleteAndReBalance(Block curr, K key, InnerNode parent, InnerNode lAnchor,
+                                   InnerNode rAnchor, Block leftNode, Block rightNode) throws IOException,
+                                                                           InvalidBlockExcepxtion {
+
+        if(isInnerNode(curr)){
+            InnerNode currInner = new InnerNode(curr, false);
+
+            InnerNode nextLeftAnchor, nextRightAnchor;
+
+            int nextPtrIdx = currInner.nextPointersIndex(key);
+            Block nextLeft = null, nextRight = null;
+
+            if(nextPtrIdx == 0){
+                if(leftNode != null){
+                    assert  isInnerNode(leftNode);
+                    InnerNode leftInner = new InnerNode(leftNode, false);
+
+                    int nextLeftPtr = leftInner.getPointer(leftInner.getNumOfPointers() - 1);
+                    nextLeft = indexFile.loadBlock(nextLeftPtr);
+                }
+                nextLeftAnchor = lAnchor;
+            }
+            else{
+                nextLeft = indexFile.loadBlock(currInner.getPointer(nextPtrIdx - 1));
+                nextLeftAnchor = currInner;
+            }
+
+            if(nextPtrIdx == currInner.getNumOfPointers() - 1){
+                if(rightNode != null){
+                    assert isInnerNode(rightNode);
+                    InnerNode rightInner = new InnerNode(rightNode, false);
+
+                    nextRight = indexFile.loadBlock(rightInner.getPointer(0));
+                }
+                nextRightAnchor = rAnchor;
+            }
+            else{
+                nextRight = indexFile.loadBlock(currInner.getPointer(nextPtrIdx + 1));
+                nextRightAnchor = currInner;
+            }
+
+            int nextPtr = currInner.getPointer(nextPtrIdx);
+            int rmPtr = deleteAndReBalance(indexFile.loadBlock(nextPtr), key, currInner,
+                                           nextLeftAnchor, nextRightAnchor,
+                                           nextLeft, nextRight);
+
+            if(rmPtr != -1){
+                //deleting from inner node
+                int keyToRemove = currInner.findPointerOffset(rmPtr);
+
+                assert keyToRemove != -1;
+
+                if(keyToRemove > 0)
+                    --keyToRemove;
+
+                currInner.removeKeyAndGtPtr(keyToRemove);
+
+                int numOfPointers = currInner.getNumOfPointers();
+                int threshold = ceilOfHalf(pointersPerInnerNode);
+
+                if(numOfPointers < threshold){
+                    InnerNode balanceNode;
+                    InnerNode anchorNode;
+                    //underflow
+                    if(rightNode == null && leftNode == null){
+                        //deleting from root
+                        if(currInner.getNumOfPointers() == 1){
+                            //collapsing root
+                            int newRoot = currInner.getPointer(0);
+                            Block header = indexFile.loadBlock(0);
+                            header.putInt(ROOT_POINTER_OFFSET, newRoot);
+                        }
+                        return -1;
+                    }
+                    else if(rightNode == null){
+                        //deleting from leftmost leaf node
+                        assert isInnerNode(leftNode);
+                        balanceNode = new InnerNode(leftNode, false);
+                        anchorNode = lAnchor;
+                    }
+                    else if(leftNode == null){
+                        //deleting from rightmost leaf node
+                        assert isInnerNode(rightNode);
+                        balanceNode = new InnerNode(rightNode, false);
+                        anchorNode = rAnchor;
+                    }
+                    else{
+                        //deleting from an interim node
+                        assert isInnerNode(rightNode) && isInnerNode(leftNode);
+                        InnerNode leftInner = new InnerNode(leftNode, false),
+                                  rightInner = new InnerNode(rightNode, false);
+                        int leftPointers = leftInner.getNumOfPointers(),
+                            rightPointers = rightInner.getNumOfPointers();
+
+                        if(rightPointers > leftPointers){
+                            balanceNode = rightInner;
+                            anchorNode = rAnchor;
+                        }
+                        else{
+                            balanceNode = leftInner;
+                            anchorNode = lAnchor;
+                        }
+                    }
+
+                    int pointersInBalanceNode = balanceNode.getNumOfPointers();
+
+                    if(pointersInBalanceNode > threshold){
+                        //borrowing from balance node
+                        K separatorVal;
+
+                        if(anchorNode == rAnchor){
+                            //borrowing from right
+                            separatorVal = balanceNode.getKey(0);
+                        }
+                        else{
+                            //borrowing from left
+                            separatorVal = currInner.getKey(0);
+                        }
+
+                        int anchorsSepIndex = anchorNode.nextPointersIndex(separatorVal);
+
+                        assert anchorsSepIndex > 0;
+
+                        int neighborIndex;
+                        if(anchorNode == rAnchor){
+                            neighborIndex = 0;
+                            currInner.insertKey(anchorNode.getKey(anchorsSepIndex - 1),
+                                                balanceNode.getPointer(neighborIndex));
+                        }
+                        else{
+                            neighborIndex = pointersInBalanceNode - 1;
+                            currInner.insertKey(anchorNode.getKey(anchorsSepIndex - 1),
+                                                currInner.getPointer(0));
+                        }
+
+                        int currNumOfPointers = currInner.getNumOfPointers();
+                        int splitNum = currNumOfPointers + pointersInBalanceNode >>> 1;
+
+                        for(int i = currNumOfPointers; i < splitNum; ++i){
+                            //start borrowing keys and pointers
+                            Pair<K, Integer> bKey = balanceNode.removeKeyAndGtPtr(neighborIndex);
+                            currInner.insertKey(bKey.first, bKey.second);
+
+                            if(anchorNode == lAnchor)
+                                --neighborIndex;
+                        }
+
+                        Pair<K, Integer> newSepVal;
+                        if(anchorNode == rAnchor){
+                            newSepVal = balanceNode.removeKeyAndGtPtr(0);
+                            balanceNode.setPointer(0, newSepVal.second);
+                        }
+                        else{
+                            int balanceIdx = balanceNode.getNumOfPointers() - 1;
+                            newSepVal = balanceNode.removeKeyAndGtPtr(balanceIdx);
+                            currInner.setPointer(0, newSepVal.second);
+                        }
+
+                        anchorNode.setKey(anchorsSepIndex - 1, newSepVal.first);
+
+                    }
+                    else{
+                        //merging with neighbors
+
+                        assert pointersInBalanceNode == threshold;
+
+                        InnerNode mergeNode;
+
+                        if(rAnchor == parent){
+                            mergeNode = currInner;
+                            currInner = new InnerNode(rightNode, false);
+                        }
+                        else{
+                            mergeNode = new InnerNode(leftNode, false);
+                        }
+
+                        K sep = currInner.getKey(0);
+                        int parentsSepIndex = parent.nextPointersIndex(sep);
+                        assert parentsSepIndex > 0;
+
+                        K parentsKey;
+                        int gtPtr;
+                        parentsKey = parent.getKey(parentsSepIndex - 1);
+                        gtPtr = currInner.getPointer(0);
+                        currInner.insertKey(parentsKey, gtPtr);
+
+                        for(int i = 0; i < currInner.getNumOfPointers() - 1; ++i)
+                            mergeNode.insertKey(currInner.getKey(i),
+                                                currInner.getPointer(i + 1));
+
+                        int rv = currInner.block.getBlockNum();
+                        this.indexFile.disposeBlock(currInner.block);
+
+                        return rv;
+                    }
+                }
+
+            }
+        }
+        else{
+            assert isLeafNode(curr);
+
+            LeafNode leaf = new LeafNode(curr);
+
+            Pair<RecordPointer, Integer> rec = leaf.findKey(key);
+
+
+            if(rec != null){
+                recordFile.deleteRecord(rec.first);
+                leaf.removeKey(rec.second);
+
+                int numOfPointers = leaf.getNumOfPointers();
+                int threshold = ceilOfHalf(pointersPerLeafNode);
+
+                if(numOfPointers < threshold){
+                    //underflow
+                    LeafNode balanceLeaf;
+                    if(rightNode == null && leftNode == null){
+                        //deleting from root
+                        if(numOfPointers == 0){
+                            indexFile.disposeBlock(curr);
+                            Block header = indexFile.loadBlock(0);
+                            header.putInt(ROOT_POINTER_OFFSET, -1);
+                        }
+                        return -1;
+                    }
+                    else if(rightNode == null){
+                        //deleting from leftmost leaf node
+                        assert isLeafNode(leftNode);
+                        balanceLeaf = new LeafNode(leftNode);
+                    }
+                    else if(leftNode == null){
+                        //deleting from rightmost leaf node
+                        assert isLeafNode(rightNode);
+                        balanceLeaf = new LeafNode(rightNode);
+                    }
+                    else{
+                        //deleting from an interim node
+                        assert isLeafNode(rightNode) && isLeafNode(leftNode);
+                        LeafNode leftLeaf = new LeafNode(leftNode),
+                                 rightLeaf = new LeafNode(rightNode);
+                        int leftPointers = leftLeaf.getNumOfPointers(),
+                            rightPointers = rightLeaf.getNumOfPointers();
+
+                        if(rightPointers > leftPointers)
+                            balanceLeaf = rightLeaf;
+                        else
+                            balanceLeaf = leftLeaf;
+                    }
+
+                    int balanceLeafPointers = balanceLeaf.getNumOfPointers();
+
+                    if(balanceLeafPointers > threshold){
+                        //borrowing from neighbor
+                        int splitNum = numOfPointers + balanceLeafPointers >>> 1;
+
+                        int neighborIndex;
+                        K oldSepVal;
+
+                        if(balanceLeaf.block == rightNode){
+                            neighborIndex = 0;
+                            oldSepVal = balanceLeaf.getPointer(0).second;
+                        }
+                        else{
+                            neighborIndex = balanceLeafPointers - 1;
+                            oldSepVal = rec.second == 0 ? key : leaf.getPointer(0).second;
+                        }
+
+                        for(int i = numOfPointers; i < splitNum; ++i){
+                            Pair<RecordPointer, K> bPointer = balanceLeaf.removeKey(neighborIndex);
+                            leaf.insertPointer(bPointer.second, bPointer.first);
+
+                            if(balanceLeaf.block == leftNode)
+                                --neighborIndex;
+                        }
+
+                        InnerNode anchor;
+
+                        if(balanceLeaf.block == rightNode)
+                            anchor = rAnchor;
+                        else
+                            anchor = lAnchor;
+
+                        K newSepVal;
+
+                        if(anchor == rAnchor)
+                            newSepVal = balanceLeaf.getPointer(0).second;
+                        else
+                            newSepVal = leaf.getPointer(0).second;
+
+                        int updateIndex = anchor.nextPointersIndex(oldSepVal);
+
+                        assert updateIndex > 0;
+                        anchor.setKey(updateIndex - 1, newSepVal);
+                    }
+                    else{
+                        //merging with neighbor
+
+                        assert balanceLeafPointers == threshold;
+
+                        for(int i = 0; i < leaf.getNumOfPointers(); ++i){
+                            Pair<RecordPointer, K> ptr = leaf.getPointer(i);
+                            balanceLeaf.insertPointer(ptr.second, ptr.first);
+                        }
+
+                        //updating next leaf pointer
+                        if(balanceLeaf.block == leftNode)
+                            balanceLeaf.setNextLeaf(leaf.getNextLeaf());
+
+                        int rv = leaf.getBlockNum();
+
+                        indexFile.disposeBlock(leaf.block);
+
+                        //this fucking asymmetric structure of an inner node drives ne crazy
+                        //a hack to avoid propagate additional information
+                        if(parent.findPointerOffset(leaf.getBlockNum()) == 0){
+                            rv = balanceLeaf.getBlockNum();
+                            parent.setPointer(0, rv);
+                        }
+
+                        return rv;
+                    }
+                }
+            }
+        }
+
+        return -1;
+    }
+
+    public void delete(K key) throws IOException, InvalidBlockExcepxtion {
+        Block header = indexFile.loadBlock(0);
+
+        int rootBlockNum = getRootBlock(header);
+        if(rootBlockNum == -1)
+            return;
+
+        Block root = indexFile.loadBlock(rootBlockNum);
+
+        deleteAndReBalance(root, key, null, null, null, null, null);
     }
 
     @Override

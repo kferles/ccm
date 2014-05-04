@@ -49,7 +49,7 @@ public class TestBPlusIndex {
         t1.commit();
         t1.end();
 
-        System.out.println("Testing leaf spleat with various insert positions...");
+        System.out.println("Testing leaf split with various insert positions...");
         for(int j = 0, newInsPos = 0; j < 12; ++j, newInsPos += 2){
             Files.delete(p);
             currId = 1;
@@ -204,6 +204,107 @@ public class TestBPlusIndex {
         }
         t1.begin();
         System.out.println(bPlusIndex.toString() + newIds.size());
+        t1.commit();
+        t1.end();
+
+        //Testing delete
+        System.out.println("Testing delete...");
+        Files.delete(p);
+        BufferManager.getInstance().reset();
+        bPlusIndex = new BPlusIndex<>(fileName, true, employeeFactory, employeeKeyValFactory);
+
+        //Deleting last element
+        t1.begin();
+        bPlusIndex.insert(0, new EmployeeRecord(0, "Kostas", "Ferles"));
+        System.out.println(bPlusIndex.toString());
+
+        bPlusIndex.delete(0);
+        System.out.println(bPlusIndex.toString());
+        t1.commit();
+        t1.end();
+
+        //Testing leaf shifting from neighbor
+        System.out.println("Testing shifting after delete at leaf nodes");
+        Files.delete(p);
+        currId = 0;
+        BufferManager.getInstance().reset();
+        bPlusIndex = new BPlusIndex<>(fileName, true, employeeFactory, employeeKeyValFactory);
+        t1.begin();
+        for(int i = 0; i < 17; ++i, currId += 6){
+            bPlusIndex.insert(currId, new EmployeeRecord(currId, "Kostas", "Ferles"));
+        }
+        System.out.println(bPlusIndex.toString());
+
+        System.out.println("Borrowing from right leaf node");
+        bPlusIndex.delete(0);
+        System.out.println(bPlusIndex.toString());
+
+        System.out.println("Borrowing from left leaf node");
+        bPlusIndex.delete(54);
+        bPlusIndex.delete(72);
+        bPlusIndex.delete(90);
+
+        System.out.println(bPlusIndex.toString());
+
+        //filling up again rightmost leaf node
+        bPlusIndex.insert(54, new EmployeeRecord(54, "Kostas", "Ferles"));
+        bPlusIndex.insert(72, new EmployeeRecord(72, "Kostas", "Ferles"));
+        bPlusIndex.insert(90, new EmployeeRecord(90, "Kostas", "Ferles"));
+        bPlusIndex.insert(102, new EmployeeRecord(102, "Kostas", "Ferles"));
+        bPlusIndex.insert(108, new EmployeeRecord(108, "Kostas", "Ferles"));
+        t1.commit();
+        t1.end();
+
+        t1.begin();
+        currId = 114;
+        for(int i = 0; i < 16; ++i){
+            for(int j = 0; j < 11; ++j, currId += 6)
+                bPlusIndex.insert(currId, new EmployeeRecord(currId, "Kostas", "Ferles"));
+        }
+
+        System.out.println("Testing shift from right neighbor but different parent node");
+        bPlusIndex.insert(407, new EmployeeRecord(407, "Kostas", "Ferles"));
+        System.out.println(bPlusIndex.toString());
+
+        bPlusIndex.delete(366);
+        System.out.println(bPlusIndex.toString());
+
+        System.out.println("Testing shift from left neighbor but different parent node");
+        bPlusIndex.insert(366, new EmployeeRecord(366, "Kostas", "Ferles"));
+        bPlusIndex.delete(402);
+        System.out.println(bPlusIndex.toString());
+
+        System.out.println("And one more round of the same");
+        bPlusIndex.insert(727, new EmployeeRecord(727, "Kostas", "Ferles"));
+        bPlusIndex.delete(744);
+
+        System.out.println(bPlusIndex.toString());
+        bPlusIndex.insert(728, new EmployeeRecord(727, "Kostas", "Ferles"));
+        bPlusIndex.delete(726);
+        System.out.println(bPlusIndex.toString());
+
+        System.out.println("Testing leaf and inner node merging");
+        bPlusIndex.delete(84);
+        System.out.println(bPlusIndex.toString());
+
+        bPlusIndex.delete(90);
+        bPlusIndex.delete(96);
+        bPlusIndex.delete(102);
+        bPlusIndex.delete(108);
+        bPlusIndex.delete(114);
+        System.out.println(bPlusIndex.toString());
+
+        bPlusIndex.delete(60);
+        bPlusIndex.delete(48);
+        System.out.println(bPlusIndex.toString());
+
+        bPlusIndex.delete(6);
+        bPlusIndex.delete(18);
+        bPlusIndex.delete(12);
+        bPlusIndex.delete(54);
+        bPlusIndex.delete(66);
+        bPlusIndex.delete(72);
+        System.out.println(bPlusIndex.toString());
         t1.commit();
         t1.end();
     }

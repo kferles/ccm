@@ -34,6 +34,8 @@ public class BufferManager {
 
     private Map<FileChannel, Map<Integer, Block>> cleanBlocks = new HashMap<>();
 
+    private Map<FileChannel, Map<Integer, Pair<Block, Integer>>> occupiedBlocks = new HashMap<>();
+
     private List<Pair<FileChannel, Integer>>  victimizePool = new ArrayList<>();
 
     private BufferManager(){
@@ -47,14 +49,35 @@ public class BufferManager {
     private ByteBuffer victimize(){
         Pair<FileChannel, Integer> victim = victimizePool.remove(0);
         Map<Integer, Block> blocks = cleanBlocks.get(victim.first);
-        return blocks.remove(victim.second).getBuffer();
+        Block blk = blocks.remove(victim.second);
+
+        assert !victimizePool.contains(victim);
+        assert !blk.isDirty();
+
+        return blk.getBuffer();
     }
 
     private Block checkCachedBlocks(FileChannel channel, Integer number){
+        if(occupiedBlocks.containsKey(channel)){
+            Map<Integer, Pair<Block, Integer>> blocksToXactions = occupiedBlocks.get(channel);
+            if(blocksToXactions.containsKey(number)){
+                Pair<Block, Integer> refCountBlock = blocksToXactions.get(number);
+                refCountBlock.second++;
+                return refCountBlock.first;
+            }
+        }
         if(cleanBlocks.containsKey(channel)){
             Map<Integer, Block> blockMap = cleanBlocks.get(channel);
-            if(blockMap.containsKey(number))
-                return blockMap.remove(number);
+            if(blockMap.containsKey(number)){
+                Block rv = blockMap.remove(number);
+                if(!occupiedBlocks.containsKey(channel))
+                    occupiedBlocks.put(channel, new HashMap<Integer, Pair<Block, Integer>>());
+
+                occupiedBlocks.get(channel).put(number, new Pair<>(rv, 1));
+                assert victimizePool.contains(new Pair<>(channel, number));
+                victimizePool.remove(new Pair<>(channel, number));
+                return rv;
+            }
         }
         return null;
     }
@@ -67,11 +90,13 @@ public class BufferManager {
 
         FileChannel channel = bf.getChannel();
 
+        if(currXaction.contains(channel, number))
+            return currXaction.get(channel, number);
         if(!newBlock){
             Block rv = checkCachedBlocks(channel, number);
             if(rv != null){
-               currXaction.addBlock(rv);
-               return rv;
+                currXaction.addBlock(channel, rv);
+                return rv;
             }
         }
 
@@ -84,14 +109,6 @@ public class BufferManager {
             catch (InterruptedException _) { }
         }
 
-        if(!newBlock){
-            Block rv = checkCachedBlocks(channel, number);
-            if(rv != null){
-                currXaction.addBlock(rv);
-                return rv;
-            }
-        }
-
         if(!availableBuffers.isEmpty())
             buff = availableBuffers.remove(0);
         else if(!victimizePool.isEmpty())
@@ -99,11 +116,23 @@ public class BufferManager {
         else
             assert false;
 
-        if(!newBlock)
+        if(!newBlock){
+            buff.position(0);
+            buff.limit(bufferSize);
             channel.read(buff, number*bufferSize);
+        }
+
         Block rv = new Block(number, buff, bf, newBlock);
 
-        currXaction.addBlock(rv);
+        if(!occupiedBlocks.containsKey(channel))
+            occupiedBlocks.put(channel, new HashMap<Integer, Pair<Block, Integer>>());
+
+        occupiedBlocks.get(channel).put(number, new Pair<>(rv, 1));
+
+        assert !cleanBlocks.containsKey(channel) || cleanBlocks.get(channel).get(number) == null;
+
+
+        currXaction.addBlock(channel, rv);
 
         return rv;
     }
@@ -113,24 +142,28 @@ public class BufferManager {
         Integer num = block.getBlockNum();
 
         assert !block.isDirty();
+        assert occupiedBlocks.get(channel).get(num) != null;
 
-        if(!cleanBlocks.containsKey(channel)){
-            cleanBlocks.put(channel, new HashMap<Integer, Block>());
-        }
+        Pair<Block, Integer> refCountBlock = occupiedBlocks.get(channel).remove(num);
 
-        Map<Integer, Block> blocks = cleanBlocks.get(channel);
-        blocks.put(num, block);
+        if(--refCountBlock.second == 0){
+            if(!cleanBlocks.containsKey(channel)){
+                cleanBlocks.put(channel, new HashMap<Integer, Block>());
+            }
 
-        Pair<FileChannel, Integer> entry = new Pair<>(channel, num);
-        if(!victimizePool.contains(entry)) {
+            Map<Integer, Block> blocks = cleanBlocks.get(channel);
+            blocks.put(num, block);
+
+            Pair<FileChannel, Integer> entry = new Pair<>(channel, num);
+            assert !victimizePool.contains(entry);
+
             victimizePool.add(entry);
-        }
 
-        notify();
+            notify();
+        }
     }
 
     public synchronized void invalidateBlock(Block block) throws IOException, InvalidBlockExcepxtion {
-
         FileChannel channel = block.getChannel();
         Integer num = block.getBlockNum();
 
@@ -164,5 +197,9 @@ public class BufferManager {
         for(int i = 0; i < maxBuffNum; i++){
             availableBuffers.add(ByteBuffer.allocateDirect(bufferSize));
         }
+    }
+
+    public synchronized int getAvailableBuffersNum(){
+        return availableBuffers.size();
     }
 }

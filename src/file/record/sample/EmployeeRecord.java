@@ -72,7 +72,8 @@ public class EmployeeRecord implements SerializableRecord,
     }
 
     public String getFirstName() {
-        return new String(firstName);
+        String rv = new String(firstName);
+        return rv.substring(0, rv.indexOf('\0'));
     }
 
     public void setFirstName(String firstName) {
@@ -80,7 +81,8 @@ public class EmployeeRecord implements SerializableRecord,
     }
 
     public String getLastName() {
-        return new String(lastName);
+        String rv = new String(lastName);
+        return rv.substring(0, rv.indexOf('\0'));
     }
 
     public void setLastName(String lastName) {

@@ -82,7 +82,7 @@ public class HeapRecordFile<R extends SerializableRecord> {
         updateRecPtr(block, src, new RecordPointer(block.getBlockNum(), dest));
     }
 
-    private Block allocateNewBlock() throws IOException {
+    private Block allocateNewBlock(Block header) throws IOException {
         Block newBlock = blockFile.allocateNewBlock();
 
         int i = 0;
@@ -92,7 +92,6 @@ public class HeapRecordFile<R extends SerializableRecord> {
             }
         }
 
-        Block header = blockFile.loadBlock(0);
         RecordPointer freeList = getFreeListHead(header);
         updateRecPtr(newBlock, i, freeList);
 
@@ -147,7 +146,7 @@ public class HeapRecordFile<R extends SerializableRecord> {
         RecordPointer insertPtr;
 
         if(freeListHead.getBlockNum() == -1){
-            allocateNewBlock();
+            allocateNewBlock(header);
             insertPtr = getFreeListHead(header);
         }
         else{

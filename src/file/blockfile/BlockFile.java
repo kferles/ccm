@@ -3,15 +3,12 @@ package file.blockfile;
 import buffermanager.BufferManager;
 import config.ConfigParameters;
 import exception.InvalidBlockExcepxtion;
-import xaction.Xaction;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.Map;
 
 import static util.FileSystemMethods.*;
 
@@ -41,11 +38,6 @@ public final class BlockFile {
 
     private FileChannel channel;
 
-    private Map<Integer, Block> loadedBlocks = new HashMap<>();
-
-    //This is only for debugging.
-    private int numOfBlocks;
-
     //TODO: add blockSize in metadata (only if there is enough time)
     private void initializeMetadata() throws IOException {
         Block header = new Block(0, ByteBuffer.allocateDirect(bufferSize), this, false);
@@ -56,9 +48,7 @@ public final class BlockFile {
     }
 
     private int getNumOfBlocks(Block header) throws IOException {
-        int rv = header.getInt(NUM_OF_BLOCKS_OFFSET);
-        assert rv == numOfBlocks;
-        return rv;
+        return header.getInt(NUM_OF_BLOCKS_OFFSET);
     }
 
     private int getFreeListHead(Block header) throws IOException {
@@ -109,7 +99,6 @@ public final class BlockFile {
         else{
             ByteBuffer buff = ByteBuffer.allocateDirect(bufferSize);
             this.channel.read(buff, 0);
-            numOfBlocks = buff.getInt(NUM_OF_BLOCKS_OFFSET);
         }
     }
 
@@ -124,26 +113,10 @@ public final class BlockFile {
 
     public Block loadBlock(int num) throws IOException {
 
-        assert num <= numOfBlocks;
-
-        if(loadedBlocks.containsKey(num)){
-            Block rv = loadedBlocks.get(num);
-            assert Xaction.getExecutingXaction().contains(rv);
-            return rv;
-        }
-
-        Block rv = bufManager.getBlock(this, num, false);
-        loadedBlocks.put(num, rv);
-
-        return rv;
+        return bufManager.getBlock(this, num, false);
     }
 
     public void commitBlock(Block block) throws IOException, InvalidBlockExcepxtion {
-
-        int blockNum = block.getBlockNum();
-
-        assert loadedBlocks.containsKey(blockNum);
-        loadedBlocks.remove(blockNum);
 
         if(block.isDirty()){
             block.writeToFile();
@@ -160,16 +133,11 @@ public final class BlockFile {
 
     public void disposeBlock(Block block) throws IOException, InvalidBlockExcepxtion {
 
-        int blockNum = block.getBlockNum();
-
-        assert blockNum > 0 && blockNum <= numOfBlocks;
-
         byte active = block.getByte(ACTIVE_BLOCK_OFFSET);
 
         if(active != ACTIVE_BLOCK)
             throw new InvalidBlockExcepxtion("Trying to dispose a free block");
 
-        assert loadedBlocks.containsKey(blockNum);
         updateFreeListHead(loadBlock(0), block);
 
         block.setDisposed(true);
@@ -185,11 +153,8 @@ public final class BlockFile {
             int numOfBlocks = getNumOfBlocks(header);
             updateNumOfBlocks(header, ++numOfBlocks);
 
-            this.numOfBlocks = numOfBlocks;
-
             rv = bufManager.getBlock(this, numOfBlocks, true);
             newBlock = true;
-            loadedBlocks.put(numOfBlocks, rv);
         }
         rv.putByte(ACTIVE_BLOCK_OFFSET, ACTIVE_BLOCK);
 

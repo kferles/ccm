@@ -304,6 +304,9 @@ public class TestBPlusIndex {
         bPlusIndex.delete(54);
         bPlusIndex.delete(66);
         bPlusIndex.delete(72);
+        bPlusIndex.delete(150);
+        bPlusIndex.delete(132);
+        bPlusIndex.delete(120);
         System.out.println(bPlusIndex.toString());
         t1.commit();
         t1.end();

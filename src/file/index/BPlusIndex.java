@@ -1003,25 +1003,26 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord> {
 
                         assert balanceLeafPointers == threshold;
 
-                        for(int i = 0; i < leaf.getNumOfPointers(); ++i){
-                            Pair<RecordPointer, K> ptr = leaf.getPointer(i);
-                            balanceLeaf.insertPointer(ptr.second, ptr.first);
+                        LeafNode mergeLeaf;
+
+                        if(rAnchor == parent){
+                            mergeLeaf = leaf;
+                            leaf = new LeafNode(rightNode);
+                        }
+                        else{
+                            mergeLeaf = new LeafNode(leftNode);
                         }
 
-                        //updating next leaf pointer
-                        if(balanceLeaf.block == leftNode)
-                            balanceLeaf.setNextLeaf(leaf.getNextLeaf());
+                        for(int i = 0; i < leaf.getNumOfPointers(); ++i){
+                            Pair<RecordPointer, K> ptr = leaf.getPointer(i);
+                            mergeLeaf.insertPointer(ptr.second, ptr.first);
+                        }
+
+                        mergeLeaf.setNextLeaf(leaf.getNextLeaf());
 
                         int rv = leaf.getBlockNum();
 
                         indexFile.disposeBlock(leaf.block);
-
-                        //this fucking asymmetric structure of an inner node drives ne crazy
-                        //a hack to avoid propagate additional information
-                        if(parent.findPointerOffset(leaf.getBlockNum()) == 0){
-                            rv = balanceLeaf.getBlockNum();
-                            parent.setPointer(0, rv);
-                        }
 
                         return rv;
                     }

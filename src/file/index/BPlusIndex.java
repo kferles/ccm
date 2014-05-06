@@ -813,7 +813,7 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord> {
                         //borrowing from balance node
                         K separatorVal;
 
-                        if(anchorNode == rAnchor){
+                        if(balanceNode.block == rightNode){
                             //borrowing from right
                             separatorVal = balanceNode.getKey(0);
                         }
@@ -827,13 +827,13 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord> {
                         assert anchorsSepIndex > 0;
 
                         int neighborIndex;
-                        if(anchorNode == rAnchor){
+                        if(balanceNode.block == rightNode){
                             neighborIndex = 0;
                             currInner.insertKey(anchorNode.getKey(anchorsSepIndex - 1),
                                                 balanceNode.getPointer(neighborIndex));
                         }
                         else{
-                            neighborIndex = pointersInBalanceNode - 1;
+                            neighborIndex = pointersInBalanceNode - 2;
                             currInner.insertKey(anchorNode.getKey(anchorsSepIndex - 1),
                                                 currInner.getPointer(0));
                         }
@@ -846,17 +846,17 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord> {
                             Pair<K, Integer> bKey = balanceNode.removeKeyAndGtPtr(neighborIndex);
                             currInner.insertKey(bKey.first, bKey.second);
 
-                            if(anchorNode == lAnchor)
+                            if(balanceNode.block == leftNode)
                                 --neighborIndex;
                         }
 
                         Pair<K, Integer> newSepVal;
-                        if(anchorNode == rAnchor){
+                        if(balanceNode.block == rightNode){
                             newSepVal = balanceNode.removeKeyAndGtPtr(0);
                             balanceNode.setPointer(0, newSepVal.second);
                         }
                         else{
-                            int balanceIdx = balanceNode.getNumOfPointers() - 1;
+                            int balanceIdx = balanceNode.getNumOfPointers() - 2;
                             newSepVal = balanceNode.removeKeyAndGtPtr(balanceIdx);
                             currInner.setPointer(0, newSepVal.second);
                         }
@@ -988,7 +988,7 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord> {
 
                         K newSepVal;
 
-                        if(anchor == rAnchor)
+                        if(balanceLeaf.block == rightNode)
                             newSepVal = balanceLeaf.getPointer(0).second;
                         else
                             newSepVal = leaf.getPointer(0).second;

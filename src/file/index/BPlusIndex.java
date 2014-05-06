@@ -662,7 +662,7 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
 
         LeafNode insertLeaf = findLeafNodeForKey(root, key, pathFromRoot);
 
-        if(insertLeaf.findKey(key) != null)
+        if(insertLeaf.getNumOfPointers() > 0 && insertLeaf.findKey(key) != null)
             throw new InvalidRecordException("Record with key: " + key + " already exists");
 
         if(!insertLeaf.isFull())

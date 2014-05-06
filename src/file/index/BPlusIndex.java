@@ -1030,122 +1030,120 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
             if(rec == null)
                 throw new InvalidRecordException("Record with key: " + key + " does not exist");
 
-            if(rec != null){
-                recordFile.deleteRecord(rec.first);
-                leaf.removeKey(rec.second);
+            recordFile.deleteRecord(rec.first);
+            leaf.removeKey(rec.second);
 
-                int numOfPointers = leaf.getNumOfPointers();
-                int threshold = ceilOfHalf(pointersPerLeafNode);
+            int numOfPointers = leaf.getNumOfPointers();
+            int threshold = ceilOfHalf(pointersPerLeafNode);
 
-                if(numOfPointers < threshold){
-                    //underflow
-                    LeafNode balanceLeaf;
-                    if(rightNode == null && leftNode == null){
-                        //deleting from root
-                        if(numOfPointers == 0){
-                            indexFile.disposeBlock(curr);
-                            Block header = indexFile.loadBlock(0);
-                            header.putInt(ROOT_POINTER_OFFSET, -1);
-                        }
-                        return -1;
+            if(numOfPointers < threshold){
+                //underflow
+                LeafNode balanceLeaf;
+                if(rightNode == null && leftNode == null){
+                    //deleting from root
+                    if(numOfPointers == 0){
+                        indexFile.disposeBlock(curr);
+                        Block header = indexFile.loadBlock(0);
+                        header.putInt(ROOT_POINTER_OFFSET, -1);
                     }
-                    else if(rightNode == null){
-                        //deleting from leftmost leaf node
-                        assert isLeafNode(leftNode);
-                        balanceLeaf = new LeafNode(leftNode);
-                    }
-                    else if(leftNode == null){
-                        //deleting from rightmost leaf node
-                        assert isLeafNode(rightNode);
-                        balanceLeaf = new LeafNode(rightNode);
-                    }
-                    else{
-                        //deleting from an interim node
-                        assert isLeafNode(rightNode) && isLeafNode(leftNode);
-                        LeafNode leftLeaf = new LeafNode(leftNode),
-                                 rightLeaf = new LeafNode(rightNode);
-                        int leftPointers = leftLeaf.getNumOfPointers(),
-                            rightPointers = rightLeaf.getNumOfPointers();
+                    return -1;
+                }
+                else if(rightNode == null){
+                    //deleting from leftmost leaf node
+                    assert isLeafNode(leftNode);
+                    balanceLeaf = new LeafNode(leftNode);
+                }
+                else if(leftNode == null){
+                    //deleting from rightmost leaf node
+                    assert isLeafNode(rightNode);
+                    balanceLeaf = new LeafNode(rightNode);
+                }
+                else{
+                    //deleting from an interim node
+                    assert isLeafNode(rightNode) && isLeafNode(leftNode);
+                    LeafNode leftLeaf = new LeafNode(leftNode),
+                             rightLeaf = new LeafNode(rightNode);
+                    int leftPointers = leftLeaf.getNumOfPointers(),
+                        rightPointers = rightLeaf.getNumOfPointers();
 
-                        if(rightPointers > leftPointers)
-                            balanceLeaf = rightLeaf;
-                        else
-                            balanceLeaf = leftLeaf;
-                    }
+                    if(rightPointers > leftPointers)
+                        balanceLeaf = rightLeaf;
+                    else
+                        balanceLeaf = leftLeaf;
+                }
 
-                    int balanceLeafPointers = balanceLeaf.getNumOfPointers();
+                int balanceLeafPointers = balanceLeaf.getNumOfPointers();
 
-                    if(balanceLeafPointers > threshold){
-                        //borrowing from neighbor
-                        int splitNum = numOfPointers + balanceLeafPointers >>> 1;
+                if(balanceLeafPointers > threshold){
+                    //borrowing from neighbor
+                    int splitNum = numOfPointers + balanceLeafPointers >>> 1;
 
-                        int neighborIndex;
-                        K oldSepVal;
+                    int neighborIndex;
+                    K oldSepVal;
 
-                        if(balanceLeaf.block == rightNode){
-                            neighborIndex = 0;
-                            oldSepVal = balanceLeaf.getPointer(0).second;
-                        }
-                        else{
-                            neighborIndex = balanceLeafPointers - 1;
-                            oldSepVal = rec.second == 0 ? key : leaf.getPointer(0).second;
-                        }
-
-                        for(int i = numOfPointers; i < splitNum; ++i){
-                            Pair<RecordPointer, K> bPointer = balanceLeaf.removeKey(neighborIndex);
-                            leaf.insertPointer(bPointer.second, bPointer.first);
-
-                            if(balanceLeaf.block == leftNode)
-                                --neighborIndex;
-                        }
-
-                        InnerNode anchor;
-
-                        if(balanceLeaf.block == rightNode)
-                            anchor = rAnchor;
-                        else
-                            anchor = lAnchor;
-
-                        K newSepVal;
-
-                        if(balanceLeaf.block == rightNode)
-                            newSepVal = balanceLeaf.getPointer(0).second;
-                        else
-                            newSepVal = leaf.getPointer(0).second;
-
-                        int updateIndex = anchor.nextPointersIndex(oldSepVal);
-
-                        assert updateIndex > 0;
-                        anchor.setKey(updateIndex - 1, newSepVal);
+                    if(balanceLeaf.block == rightNode){
+                        neighborIndex = 0;
+                        oldSepVal = balanceLeaf.getPointer(0).second;
                     }
                     else{
-                        //merging with neighbor
-
-                        assert balanceLeafPointers == threshold;
-
-                        LeafNode mergeLeaf;
-
-                        if(rAnchor == parent){
-                            mergeLeaf = leaf;
-                            leaf = new LeafNode(rightNode);
-                        }
-                        else{
-                            mergeLeaf = new LeafNode(leftNode);
-                        }
-
-                        for(int i = 0; i < leaf.getNumOfPointers(); ++i){
-                            Pair<RecordPointer, K> ptr = leaf.getPointer(i);
-                            mergeLeaf.insertPointer(ptr.second, ptr.first);
-                        }
-
-                        mergeLeaf.setNextLeaf(leaf.getNextLeaf());
-
-                        int rv = leaf.getBlockNum();
-
-                        indexFile.disposeBlock(leaf.block);
-
-                        return rv;
+                        neighborIndex = balanceLeafPointers - 1;
+                        oldSepVal = rec.second == 0 ? key : leaf.getPointer(0).second;
                     }
+
+                    for(int i = numOfPointers; i < splitNum; ++i){
+                        Pair<RecordPointer, K> bPointer = balanceLeaf.removeKey(neighborIndex);
+                        leaf.insertPointer(bPointer.second, bPointer.first);
+
+                        if(balanceLeaf.block == leftNode)
+                            --neighborIndex;
+                    }
+
+                    InnerNode anchor;
+
+                    if(balanceLeaf.block == rightNode)
+                        anchor = rAnchor;
+                    else
+                        anchor = lAnchor;
+
+                    K newSepVal;
+
+                    if(balanceLeaf.block == rightNode)
+                        newSepVal = balanceLeaf.getPointer(0).second;
+                    else
+                        newSepVal = leaf.getPointer(0).second;
+
+                    int updateIndex = anchor.nextPointersIndex(oldSepVal);
+
+                    assert updateIndex > 0;
+                    anchor.setKey(updateIndex - 1, newSepVal);
+                }
+                else{
+                    //merging with neighbor
+
+                    assert balanceLeafPointers == threshold;
+
+                    LeafNode mergeLeaf;
+
+                    if(rAnchor == parent){
+                        mergeLeaf = leaf;
+                        leaf = new LeafNode(rightNode);
+                    }
+                    else{
+                        mergeLeaf = new LeafNode(leftNode);
+                    }
+
+                    for(int i = 0; i < leaf.getNumOfPointers(); ++i){
+                        Pair<RecordPointer, K> ptr = leaf.getPointer(i);
+                        mergeLeaf.insertPointer(ptr.second, ptr.first);
+                    }
+
+                    mergeLeaf.setNextLeaf(leaf.getNextLeaf());
+
+                    int rv = leaf.getBlockNum();
+
+                    indexFile.disposeBlock(leaf.block);
+
+                    return rv;
                 }
             }
         }

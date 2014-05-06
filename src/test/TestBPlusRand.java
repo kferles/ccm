@@ -3,6 +3,7 @@ package test;
 import config.ConfigParameters;
 import exception.InvalidBlockExcepxtion;
 import exception.InvalidKeyFactoryException;
+import exception.InvalidRecordException;
 import exception.InvalidRecordSize;
 import file.index.BPlusIndex;
 import file.record.sample.EmployeeFactory;
@@ -21,7 +22,7 @@ import java.util.Set;
 
 public class TestBPlusRand {
 
-    public static void main(String[] args) throws IOException, InvalidKeyFactoryException, InvalidRecordSize, InvalidBlockExcepxtion {
+    public static void main(String[] args) throws IOException, InvalidKeyFactoryException, InvalidRecordSize, InvalidBlockExcepxtion, InvalidRecordException {
         ConfigParameters.getInstance().setMaxBuffNumber(500);
         //Making buffer size very small, only one record fits in a buffer.
         ConfigParameters.getInstance().setBufferSize(150);

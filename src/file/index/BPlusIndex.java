@@ -638,7 +638,7 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
         return heapPtr != null ? recordFile.getRecord(heapPtr.first) : null;
     }
 
-    public void insert(K key, R record) throws IOException {
+    public void insert(K key, R record) throws IOException, InvalidRecordException {
         Block header = indexFile.loadBlock(0);
 
         int rootBlockNum = getRootBlock(header);
@@ -661,6 +661,9 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
         List<InnerNode> pathFromRoot = new ArrayList<>();
 
         LeafNode insertLeaf = findLeafNodeForKey(root, key, pathFromRoot);
+
+        if(insertLeaf.findKey(key) != null)
+            throw new InvalidRecordException("Record with key: " + key + " already exists");
 
         if(!insertLeaf.isFull())
             insertLeaf.insertPointer(key, heapPtr);
@@ -721,7 +724,7 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
         int rootBlockNum = getRootBlock(header);
 
         if(rootBlockNum == -1)
-            throw new InvalidRecordException("Record with id: " + key + " does not exist");
+            throw new InvalidRecordException("Record with key: " + key + " does not exist");
 
         Block root = indexFile.loadBlock(rootBlockNum);
         LeafNode leafNode = findLeafNodeForKey(root, key, null);
@@ -729,7 +732,7 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
         Pair<RecordPointer, Integer> recPtr = leafNode.findKey(key);
 
         if(recPtr == null)
-            throw new InvalidRecordException("Record with id: " + key + " does not exist");
+            throw new InvalidRecordException("Record with key: " + key + " does not exist");
 
         recordFile.updateRecord(recPtr.first, updatedRec);
     }
@@ -820,7 +823,7 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
 
     private int deleteAndReBalance(Block curr, K key, InnerNode parent, InnerNode lAnchor,
                                    InnerNode rAnchor, Block leftNode, Block rightNode) throws IOException,
-                                                                           InvalidBlockExcepxtion {
+            InvalidBlockExcepxtion, InvalidRecordException {
 
         if(isInnerNode(curr)){
             InnerNode currInner = new InnerNode(curr, false);
@@ -1024,6 +1027,8 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
 
             Pair<RecordPointer, Integer> rec = leaf.findKey(key);
 
+            if(rec == null)
+                throw new InvalidRecordException("Record with key: " + key + " does not exist");
 
             if(rec != null){
                 recordFile.deleteRecord(rec.first);
@@ -1148,7 +1153,7 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
         return -1;
     }
 
-    public void delete(K key) throws IOException, InvalidBlockExcepxtion {
+    public void delete(K key) throws IOException, InvalidBlockExcepxtion, InvalidRecordException {
         Block header = indexFile.loadBlock(0);
 
         int rootBlockNum = getRootBlock(header);

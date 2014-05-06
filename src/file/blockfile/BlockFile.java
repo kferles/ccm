@@ -15,7 +15,6 @@ import static util.FileSystemMethods.*;
 /**
  * Created by kostas on 4/15/14.
  */
-//TODO: Which methods should be synchronized?
 public final class BlockFile {
 
     public static final int HEADER_METADATA_SIZE = 8;

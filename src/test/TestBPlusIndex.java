@@ -179,7 +179,7 @@ public class TestBPlusIndex {
         System.out.println("Testing searching once again...");
         t1.begin();
         for(Integer id : insertIds)
-            assert bPlusIndex.get(id).getId() == id;
+            assert bPlusIndex.get(id).getId().equals(id);
         assert bPlusIndex.get(-1) == null;
         assert bPlusIndex.get(350) == null;
         assert bPlusIndex.get(301) == null;

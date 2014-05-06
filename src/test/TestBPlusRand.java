@@ -70,7 +70,7 @@ public class TestBPlusRand {
                     for(Integer id1 : genIdsOrdered){
                         t1.begin();
                         EmployeeRecord rec = bPlusIndex.get(id1);
-                        assert rec.getId() == id1;
+                        assert rec.getId().equals(id1);
                         assert rec.getFirstName().compareTo("Kostas" + id1) == 0;
                         assert rec.getLastName().compareTo("Ferles" + id1) == 0;
                         t1.commit();
@@ -111,7 +111,7 @@ public class TestBPlusRand {
                     for(Integer id1 : genIdsOrdered){
                         t1.begin();
                         EmployeeRecord rec = bPlusIndex.get(id1);
-                        assert rec.getId() == id1;
+                        assert rec.getId().equals(id1);
                         assert rec.getFirstName().compareTo("Kostas" + id1) == 0;
                         assert rec.getLastName().compareTo("Ferles" + id1) == 0;
                         t1.commit();

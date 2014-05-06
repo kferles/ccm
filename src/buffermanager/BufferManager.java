@@ -167,21 +167,13 @@ public class BufferManager {
         FileChannel channel = block.getChannel();
         Integer num = block.getBlockNum();
 
-        if(cleanBlocks.containsKey(channel)){
-            Map<Integer, Block> blocks = cleanBlocks.get(channel);
-            if(blocks.containsKey(num)){
-                blocks.remove(num);
-                victimizePool.remove(new Pair<>(channel, num));
-            }
-        }
+        assert occupiedBlocks.get(channel).get(num) != null;
+        assert cleanBlocks.get(channel) == null || cleanBlocks.get(channel).get(num) == null;
 
-        if(block.isNewBlock() && !block.isDisposed()){
-            BlockFile bf = block.getBlockFile();
-            bf.disposeBlock(block);
-            block.writeToFile();
-            Block metadataBlock = bf.loadBlock(0);
-            metadataBlock.writeToFile();
-        }
+        Pair<Block, Integer> refCountBlock = occupiedBlocks.get(channel).remove(num);
+
+        //only one transaction can own the buffer in X mode
+        assert refCountBlock.second == 1;
 
         availableBuffers.add(block.getBuffer());
 

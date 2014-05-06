@@ -56,7 +56,7 @@ public class TestBPlusRand {
             }
 
 
-            System.out.println("Deleting phase...");
+            System.out.println("Deleting phase...\n");
             for(int i = 0; i < 30000; ++i){
                 int nextIdx = r.nextInt(genIdsOrdered.size());
                 Integer removeId = genIdsOrdered.remove(nextIdx);
@@ -78,6 +78,11 @@ public class TestBPlusRand {
                 }
             }
 
+            t1.begin();
+            System.out.println(bPlusIndex.toString());
+            t1.commit();
+            t1.end();
+
             System.out.println("Inserting phase 2...");
             for(int i = 0;  i < 30000; ++i){
                 Integer id = r.nextInt();
@@ -91,6 +96,33 @@ public class TestBPlusRand {
                 t1.commit();
                 t1.end();
             }
+
+            System.out.println("Deleting phase 2...\n");
+            for(int i = 0; i < 30000; ++i){
+                int nextIdx = r.nextInt(genIdsOrdered.size());
+                Integer removeId = genIdsOrdered.remove(nextIdx);
+                t1.begin();
+                bPlusIndex.delete(removeId);
+                t1.commit();
+                t1.end();
+
+                if(i >= 1000 && i%1000 == 0){
+                    for(Integer id1 : genIdsOrdered){
+                        t1.begin();
+                        EmployeeRecord rec = bPlusIndex.get(id1);
+                        assert rec.getId() == id1;
+                        assert rec.getFirstName().compareTo("Kostas" + id1) == 0;
+                        assert rec.getLastName().compareTo("Ferles" + id1) == 0;
+                        t1.commit();
+                        t1.end();
+                    }
+                }
+            }
+
+            t1.begin();
+            System.out.println(bPlusIndex.toString());
+            t1.commit();
+            t1.end();
 
         }catch (AssertionError err){
             err.printStackTrace();

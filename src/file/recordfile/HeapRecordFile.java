@@ -165,6 +165,15 @@ public class HeapRecordFile<R extends SerializableRecord> {
         return insertPtr;
     }
 
+    public void updateRecord(RecordPointer recPtr, R rec) throws IOException {
+        Block blk = blockFile.loadBlock(recPtr.getBlockNum());
+        byte[] recByte = rec.toByteArray();
+
+        int recOffset = recPtr.getBlockOffset();
+        for(int i = 0; i < recordSize; ++i)
+            blk.putByte(FIRST_RECORD_OFFSET + recOffset*recordSize + i, recByte[i]);
+    }
+
     public void deleteRecord(RecordPointer recPtr) throws IOException {
         Block header = blockFile.loadBlock(0);
         RecordPointer freeListHead = getFreeListHead(header);

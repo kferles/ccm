@@ -3,9 +3,11 @@ package file.index;
 import config.ConfigParameters;
 import exception.InvalidBlockExcepxtion;
 import exception.InvalidKeyFactoryException;
+import exception.InvalidRecordException;
 import exception.InvalidRecordSize;
 import file.blockfile.Block;
 import file.blockfile.BlockFile;
+import file.record.Identifiable;
 import file.record.KeyValueFactory;
 import file.record.RecordFactory;
 import file.record.SerializableRecord;
@@ -25,7 +27,8 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
-public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord> {
+public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
+                                                           Identifiable<K>> {
 
     private static final int BUFFER_SIZE = ConfigParameters.getInstance().getBufferSize();
 
@@ -509,6 +512,17 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord> {
             return null;
         }
 
+        public int findLowKeyIndex(K lowKey){
+            int numOfPointers = getNumOfPointers();
+            for(int i = 0; i < numOfPointers; ++i){
+                K key = getPointer(i).second;
+                if(lowKey.compareTo(key) <= 0)
+                    return i;
+            }
+
+            return -1;
+        }
+
         public Pair<RecordPointer, K> removeKey(int index){
             int numOfPointers = getNumOfPointers();
             assert index < numOfPointers;
@@ -697,6 +711,107 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord> {
                 header.putInt(ROOT_POINTER_OFFSET, newRoot.getBlockNum());
             }
         }
+    }
+
+    public void update(R updatedRec) throws IOException, InvalidRecordException {
+        K key = updatedRec.getId();
+
+        Block header = indexFile.loadBlock(0);
+
+        int rootBlockNum = getRootBlock(header);
+
+        if(rootBlockNum == -1)
+            throw new InvalidRecordException("Record with id: " + key + " does not exist");
+
+        Block root = indexFile.loadBlock(rootBlockNum);
+        LeafNode leafNode = findLeafNodeForKey(root, key, null);
+
+        Pair<RecordPointer, Integer> recPtr = leafNode.findKey(key);
+
+        if(recPtr == null)
+            throw new InvalidRecordException("Record with id: " + key + " does not exist");
+
+        recordFile.updateRecord(recPtr.first, updatedRec);
+    }
+
+    public List<R> recordsInRange(K key1, K key2) throws IOException, InvalidRecordSize {
+
+        if(key1.compareTo(key2) > 0)
+            throw new IllegalArgumentException("key1 must be smaller than key2");
+
+        List<R> rv = new ArrayList<>();
+        Block header = indexFile.loadBlock(0);
+
+        int rootBlockNum = getRootBlock(header);
+
+        if(rootBlockNum == -1)
+            return rv;
+
+        Block root = indexFile.loadBlock(rootBlockNum);
+
+        if(isLeafNode(root)){
+            LeafNode leafRoot = new LeafNode(root);
+
+            int minKeyIdx = leafRoot.findLowKeyIndex(key1);
+            for(int i = minKeyIdx, end = leafRoot.getNumOfPointers(); i < end; ++i){
+
+                Pair<RecordPointer, K> recPtr = leafRoot.getPointer(i);
+                if(recPtr.second.compareTo(key2) <= 0)
+                    rv.add(this.recordFile.getRecord(recPtr.first));
+            }
+        }
+
+        //TODO: I have to also lock all the interim nodes at each level in order to assure isolation
+        InnerNode innerRoot = new InnerNode(root, false);
+        int lowPtr = innerRoot.getPointer(innerRoot.nextPointersIndex(key1)),
+            highPtr = innerRoot.getPointer(innerRoot.nextPointersIndex(key2));
+
+        Block low = indexFile.loadBlock(lowPtr), high = indexFile.loadBlock(highPtr);
+
+        while(!isLeafNode(low) && !isLeafNode(high)){
+            InnerNode lowInner = new InnerNode(low, false);
+            InnerNode highInner = new InnerNode(high, false);
+
+            lowPtr = lowInner.getPointer(lowInner.nextPointersIndex(key1));
+            highPtr = highInner.getPointer(highInner.nextPointersIndex(key2));
+
+            low = indexFile.loadBlock(lowPtr);
+            high = indexFile.loadBlock(highPtr);
+        }
+
+        LeafNode lowLeaf = new LeafNode(low), highLeaf = new LeafNode(high);
+        int highLeafBlockNum = highLeaf.getBlockNum();
+        int minKeyIdx = lowLeaf.findLowKeyIndex(key1);
+
+        for(int i = minKeyIdx, end = lowLeaf.getNumOfPointers(); i < end; ++i){
+
+            Pair<RecordPointer, K> recPtr = lowLeaf.getPointer(i);
+            if(recPtr.second.compareTo(key2) <= 0)
+                rv.add(this.recordFile.getRecord(recPtr.first));
+            else
+                return rv;
+        }
+
+        int nextLeafPtr = lowLeaf.getNextLeaf();
+        while(nextLeafPtr != highLeafBlockNum){
+            LeafNode currLeaf = new LeafNode(indexFile.loadBlock(nextLeafPtr));
+            int numOfPtrs = currLeaf.getNumOfPointers();
+            for(int i = 0; i < numOfPtrs; ++i)
+                rv.add(this.recordFile.getRecord(currLeaf.getPointer(i).first));
+            nextLeafPtr = currLeaf.getNextLeaf();
+        }
+
+        if(low != high){
+            int highLeafPtrs = highLeaf.getNumOfPointers();
+            for(int i = 0; i < highLeafPtrs; ++i){
+                Pair<RecordPointer, K> recPtr = highLeaf.getPointer(i);
+                if(recPtr.second.compareTo(key2) > 0)
+                    break;
+                rv.add(this.recordFile.getRecord(recPtr.first));
+            }
+        }
+
+        return rv;
     }
 
     private int ceilOfHalf(int a){

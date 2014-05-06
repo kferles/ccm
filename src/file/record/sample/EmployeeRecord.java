@@ -1,12 +1,14 @@
 package file.record.sample;
 
 import exception.InvalidRecordSize;
+import file.record.Identifiable;
 import file.record.SerializableRecord;
 
 import java.nio.ByteBuffer;
 
 public class EmployeeRecord implements SerializableRecord,
-                                       Comparable<EmployeeRecord>{
+                                       Comparable<EmployeeRecord>,
+                                       Identifiable<Integer>{
 
     static final int FIRST_NAME_LENGTH = 30;
 
@@ -63,7 +65,7 @@ public class EmployeeRecord implements SerializableRecord,
         copyFromString(this.lastName, lastName);
     }
 
-    public int getId() {
+    public Integer getId() {
         return id;
     }
 

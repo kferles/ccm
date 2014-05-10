@@ -1,7 +1,6 @@
 package buffermanager;
 
 import config.ConfigParameters;
-import exception.InvalidBlockExcepxtion;
 import file.blockfile.Block;
 import file.blockfile.BlockFile;
 import util.Pair;
@@ -163,7 +162,7 @@ public class BufferManager {
         }
     }
 
-    public synchronized void invalidateBlock(Block block) throws IOException, InvalidBlockExcepxtion {
+    public synchronized void invalidateBlock(Block block) throws IOException{
         FileChannel channel = block.getChannel();
         Integer num = block.getBlockNum();
 

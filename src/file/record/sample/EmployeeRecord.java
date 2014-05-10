@@ -4,11 +4,13 @@ import exception.InvalidRecordSize;
 import file.record.Identifiable;
 import file.record.SerializableRecord;
 
+import java.io.Serializable;
 import java.nio.ByteBuffer;
 
 public class EmployeeRecord implements SerializableRecord,
                                        Comparable<EmployeeRecord>,
-                                       Identifiable<Integer>{
+                                       Identifiable<Integer>,
+                                       Serializable{
 
     static final int FIRST_NAME_LENGTH = 30;
 

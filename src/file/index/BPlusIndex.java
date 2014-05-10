@@ -89,7 +89,6 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
     }
 
     private boolean isInnerNode(Block b){
-        assert b.getBlockFile() == indexFile;
 
         return b.getByte(NODE_TYPE_OFFSET) == INNER_NODE;
     }
@@ -314,7 +313,6 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
     }
 
     private boolean isLeafNode(Block b){
-        assert b.getBlockFile() == indexFile;
 
         return b.getByte(NODE_TYPE_OFFSET) == LEAF_NODE;
     }
@@ -737,12 +735,13 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
         recordFile.updateRecord(recPtr.first, updatedRec);
     }
 
-    public List<R> recordsInRange(K key1, K key2) throws IOException, InvalidRecordSize {
+    public ArrayList<R> recordsInRange(K key1, K key2) throws IOException, InvalidRecordSize {
+
+        ArrayList<R> rv = new ArrayList<>();
 
         if(key1.compareTo(key2) > 0)
-            throw new IllegalArgumentException("key1 must be smaller than key2");
+            return rv;
 
-        List<R> rv = new ArrayList<>();
         Block header = indexFile.loadBlock(0);
 
         int rootBlockNum = getRootBlock(header);
@@ -762,6 +761,7 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
                 if(recPtr.second.compareTo(key2) <= 0)
                     rv.add(this.recordFile.getRecord(recPtr.first));
             }
+            return rv;
         }
 
         //TODO: I have to also lock all the interim nodes at each level in order to assure isolation

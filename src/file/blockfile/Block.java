@@ -1,8 +1,7 @@
 package file.blockfile;
 
 import config.ConfigParameters;
-import exception.InvalidBlockExcepxtion;
-import xaction.Xaction;
+import exception.InvalidBlockException;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -108,7 +107,7 @@ public class Block {
         this.bf.invalidateBlock(this);
     }
 
-    public void forceDispose() throws IOException, InvalidBlockExcepxtion {
+    public void forceDispose() throws IOException, InvalidBlockException {
         this.bf.disposeBlock(this);
         Block header = this.bf.loadBlock(0);
         this.writeToFile();

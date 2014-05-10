@@ -2,7 +2,7 @@ package file.blockfile;
 
 import buffermanager.BufferManager;
 import config.ConfigParameters;
-import exception.InvalidBlockExcepxtion;
+import exception.InvalidBlockException;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -138,12 +138,12 @@ public final class BlockFile {
             bufManager.releaseBlock(block);
     }
 
-    public void disposeBlock(Block block) throws IOException, InvalidBlockExcepxtion {
+    public void disposeBlock(Block block) throws IOException, InvalidBlockException {
 
         byte active = block.getByte(ACTIVE_BLOCK_OFFSET);
 
         if(active != ACTIVE_BLOCK)
-            throw new InvalidBlockExcepxtion("Trying to dispose a free block");
+            throw new InvalidBlockException("Trying to dispose a free block");
 
         updateFreeListHead(loadBlock(0), block);
 

@@ -1,6 +1,6 @@
 package test;
 
-import exception.InvalidBlockExcepxtion;
+import exception.InvalidBlockException;
 import file.blockfile.Block;
 import file.blockfile.BlockFile;
 import xaction.Xaction;
@@ -22,7 +22,7 @@ public class TestBlockFile {
         return bf.allocateNewBlock();
     }
 
-    public static void main(String[] args) throws InvalidBlockExcepxtion{
+    public static void main(String[] args) throws InvalidBlockException {
 
         try {
             Xaction t1 = new Xaction();

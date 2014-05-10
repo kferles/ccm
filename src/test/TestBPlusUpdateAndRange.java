@@ -1,7 +1,7 @@
 package test;
 
 import config.ConfigParameters;
-import exception.InvalidBlockExcepxtion;
+import exception.InvalidBlockException;
 import exception.InvalidKeyFactoryException;
 import exception.InvalidRecordException;
 import exception.InvalidRecordSize;
@@ -19,7 +19,7 @@ import java.nio.file.Path;
 public class TestBPlusUpdateAndRange {
 
 
-    public static void main(String[] args) throws IOException, InvalidKeyFactoryException, InvalidRecordSize, InvalidBlockExcepxtion, InvalidRecordException {
+    public static void main(String[] args) throws IOException, InvalidKeyFactoryException, InvalidRecordSize, InvalidBlockException, InvalidRecordException {
         ConfigParameters.getInstance().setMaxBuffNumber(500);
         //Making buffer size very small, only one record fits in a buffer.
         ConfigParameters.getInstance().setBufferSize(150);

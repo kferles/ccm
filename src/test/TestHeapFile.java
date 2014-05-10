@@ -1,6 +1,6 @@
 package test;
 
-import exception.InvalidBlockExcepxtion;
+import exception.InvalidBlockException;
 import exception.InvalidRecordSize;
 import file.record.sample.EmployeeFactory;
 import file.record.sample.EmployeeRecord;
@@ -17,7 +17,7 @@ public class TestHeapFile {
 
     private static final EmployeeRecord dummyRecord = new EmployeeRecord(1, "Kostas", "Ferles");
 
-    public static void main(String[] args) throws IOException, InvalidRecordSize, InvalidBlockExcepxtion {
+    public static void main(String[] args) throws IOException, InvalidRecordSize, InvalidBlockException {
         Xaction t1 = new Xaction();
         HeapRecordFile<EmployeeRecord> file = new HeapRecordFile<>(heapFilename,
                                                                    new EmployeeFactory());

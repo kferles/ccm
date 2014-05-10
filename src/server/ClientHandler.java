@@ -1,6 +1,6 @@
 package server;
 
-import exception.InvalidBlockExcepxtion;
+import exception.InvalidBlockException;
 import exception.InvalidRecordException;
 import exception.InvalidRecordSize;
 import exception.InvalidRequestException;
@@ -34,7 +34,7 @@ public class ClientHandler<K extends Comparable<K>, R extends SerializableRecord
     private RequestType lastReq = null;
 
     private void processRequest(RequestType req) throws InvalidRequestException, IOException,
-                                                        ClassNotFoundException, InvalidBlockExcepxtion {
+                                                        ClassNotFoundException, InvalidBlockException {
 
         switch(req){
             case BEGIN_XACTION:

@@ -1,10 +1,8 @@
 package xaction;
 
-import exception.InvalidBlockExcepxtion;
+import exception.InvalidBlockException;
 import file.blockfile.Block;
-import file.blockfile.BlockFile;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.*;
@@ -44,7 +42,7 @@ public class Xaction {
         usingBlocks.clear();
     }
 
-    public void commit() throws IOException, InvalidBlockExcepxtion {
+    public void commit() throws IOException, InvalidBlockException {
         for(FileChannel channel : usingBlocks.keySet()){
             Map<Integer, Block> blks = usingBlocks.get(channel);
             for(Integer num : blks.keySet()){
@@ -70,7 +68,7 @@ public class Xaction {
         for(Block newBlock : newBlocks){
             try {
                 newBlock.forceDispose();
-            } catch (InvalidBlockExcepxtion _) {
+            } catch (InvalidBlockException _) {
                 assert false;
             }
         }

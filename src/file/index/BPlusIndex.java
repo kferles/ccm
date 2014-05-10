@@ -1,7 +1,7 @@
 package file.index;
 
 import config.ConfigParameters;
-import exception.InvalidBlockExcepxtion;
+import exception.InvalidBlockException;
 import exception.InvalidKeyFactoryException;
 import exception.InvalidRecordException;
 import exception.InvalidRecordSize;
@@ -823,7 +823,7 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
 
     private int deleteAndReBalance(Block curr, K key, InnerNode parent, InnerNode lAnchor,
                                    InnerNode rAnchor, Block leftNode, Block rightNode) throws IOException,
-            InvalidBlockExcepxtion, InvalidRecordException {
+            InvalidBlockException, InvalidRecordException {
 
         if(isInnerNode(curr)){
             InnerNode currInner = new InnerNode(curr, false);
@@ -1151,7 +1151,7 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
         return -1;
     }
 
-    public void delete(K key) throws IOException, InvalidBlockExcepxtion, InvalidRecordException {
+    public void delete(K key) throws IOException, InvalidBlockException, InvalidRecordException {
         Block header = indexFile.loadBlock(0);
 
         int rootBlockNum = getRootBlock(header);

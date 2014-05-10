@@ -1,6 +1,6 @@
 package test;
 
-import exception.InvalidBlockExcepxtion;
+import exception.InvalidBlockException;
 import exception.InvalidKeyFactoryException;
 import exception.InvalidRecordSize;
 import file.index.BPlusIndex;
@@ -13,7 +13,7 @@ import java.io.IOException;
 
 public class PrintFile {
 
-    public static void main(String[] args) throws InvalidRecordSize, IOException, InvalidKeyFactoryException, InvalidBlockExcepxtion {
+    public static void main(String[] args) throws InvalidRecordSize, IOException, InvalidKeyFactoryException, InvalidBlockException {
         EmployeeFactory recFac = new EmployeeFactory();
         EmployeeKeyValFactory keyFac = new EmployeeKeyValFactory();
         BPlusIndex<Integer, EmployeeRecord> index = new BPlusIndex<>(args[0], false, recFac, keyFac);

@@ -2,7 +2,7 @@ package test;
 
 import buffermanager.BufferManager;
 import config.ConfigParameters;
-import exception.InvalidBlockExcepxtion;
+import exception.InvalidBlockException;
 import exception.InvalidKeyFactoryException;
 import exception.InvalidRecordException;
 import exception.InvalidRecordSize;
@@ -20,7 +20,7 @@ import java.util.*;
 
 public class TestBPlusIndex {
 
-    public static void main(String[] args) throws IOException, InvalidRecordSize, InvalidBlockExcepxtion, InvalidKeyFactoryException, InvalidRecordException {
+    public static void main(String[] args) throws IOException, InvalidRecordSize, InvalidBlockException, InvalidKeyFactoryException, InvalidRecordException {
 
         //Temporary solution until I'll find the 'victimize pool' bug
         ConfigParameters.getInstance().setMaxBuffNumber(400);

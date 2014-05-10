@@ -4,6 +4,7 @@ import exception.InvalidBlockExcepxtion;
 import file.blockfile.Block;
 import file.blockfile.BlockFile;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.*;
@@ -16,6 +17,10 @@ public class Xaction {
 
     public static Xaction getExecutingXaction(){
         return activeXactions.get(Thread.currentThread().getId());
+    }
+
+    public static boolean isXactionExecuting(Xaction xaction){
+        return activeXactions.containsKey(xaction.executingThread.getId());
     }
 
     private Thread executingThread;
@@ -44,8 +49,29 @@ public class Xaction {
             Map<Integer, Block> blks = usingBlocks.get(channel);
             for(Integer num : blks.keySet()){
                 Block block = blks.get(num);
-                BlockFile bf = block.getBlockFile();
-                bf.commitBlock(block);
+                block.commit();
+            }
+        }
+    }
+
+    public void rollback() throws IOException {
+        //TODO: do not release locks for metadata before forceDispose calls
+        List<Block> newBlocks = new ArrayList<>();
+        for(FileChannel channel : usingBlocks.keySet()){
+            Map<Integer, Block> blocks = usingBlocks.get(channel);
+            for(Integer num : blocks.keySet()){
+                Block block = blocks.get(num);
+                if(block.isNewBlock())
+                    newBlocks.add(block);
+                block.invalidate();
+            }
+        }
+
+        for(Block newBlock : newBlocks){
+            try {
+                newBlock.forceDispose();
+            } catch (InvalidBlockExcepxtion _) {
+                assert false;
             }
         }
     }

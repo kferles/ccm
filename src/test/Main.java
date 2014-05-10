@@ -9,6 +9,9 @@ public class Main {
                                                   InvocationTargetException, IllegalAccessException {
         Class<?> testClass = Class.forName(args[0]);
         Method main = testClass.getMethod("main", String[].class);
-        main.invoke(null, (Object)new String[] {});
+        int rvLen = args.length - 1;
+        String[] newArgs = new String [rvLen];
+        System.arraycopy(args, 1, newArgs, 0, rvLen);
+        main.invoke(null, (Object) newArgs);
     }
 }

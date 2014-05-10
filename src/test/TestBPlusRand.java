@@ -43,10 +43,11 @@ public class TestBPlusRand {
         try{
 
             System.out.println("Inserting phase...");
-            for(int i = 0;  i < 30000; ++i){
+            for(int i = 0;  i < 1000000; ++i){
                 Integer id = r.nextInt();
                 while(genIds.contains(id))
                     id = r.nextInt();
+                System.out.println(i + ":" + id);
                 genIds.add(id);
                 genIdsOrdered.add(id);
 
@@ -58,7 +59,7 @@ public class TestBPlusRand {
 
 
             System.out.println("Deleting phase...\n");
-            for(int i = 0; i < 30000; ++i){
+            for(int i = 0; i < 1000000; ++i){
                 int nextIdx = r.nextInt(genIdsOrdered.size());
                 Integer removeId = genIdsOrdered.remove(nextIdx);
                 t1.begin();
@@ -66,7 +67,7 @@ public class TestBPlusRand {
                 t1.commit();
                 t1.end();
 
-                if(i >= 1000 && i%1000 == 0){
+                if(i >= 500000 && i%500000 == 0){
                     for(Integer id1 : genIdsOrdered){
                         t1.begin();
                         EmployeeRecord rec = bPlusIndex.get(id1);

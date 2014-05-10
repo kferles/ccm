@@ -115,7 +115,7 @@ public final class BlockFile {
         return bufManager.getBlock(this, num, false);
     }
 
-    public void commitBlock(Block block) throws IOException, InvalidBlockExcepxtion {
+    public void commitBlock(Block block) throws IOException{
 
         if(block.isDirty()){
             block.writeToFile();
@@ -128,6 +128,14 @@ public final class BlockFile {
         else{
             bufManager.invalidateBlock(block);
         }
+    }
+
+    public void invalidateBlock(Block block) throws IOException{
+
+        if(block.isDirty())
+            bufManager.invalidateBlock(block);
+        else
+            bufManager.releaseBlock(block);
     }
 
     public void disposeBlock(Block block) throws IOException, InvalidBlockExcepxtion {

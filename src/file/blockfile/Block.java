@@ -1,6 +1,8 @@
 package file.blockfile;
 
 import config.ConfigParameters;
+import exception.InvalidBlockExcepxtion;
+import xaction.Xaction;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -70,10 +72,6 @@ public class Block {
         return this.buffer.get(index);
     }
 
-    public BlockFile getBlockFile(){
-        return this.bf;
-    }
-
     public FileChannel getChannel(){
         return this.channel;
     }
@@ -100,6 +98,21 @@ public class Block {
             channel.write(buffer);
         channel.force(true);
         this.dirty = false;
+    }
+
+    public void commit() throws IOException {
+        this.bf.commitBlock(this);
+    }
+
+    public void invalidate() throws IOException {
+        this.bf.invalidateBlock(this);
+    }
+
+    public void forceDispose() throws IOException, InvalidBlockExcepxtion {
+        this.bf.disposeBlock(this);
+        Block header = this.bf.loadBlock(0);
+        this.writeToFile();
+        header.writeToFile();
     }
 
     @Override

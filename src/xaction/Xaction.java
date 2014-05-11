@@ -2,6 +2,7 @@ package xaction;
 
 import exception.InvalidBlockException;
 import file.blockfile.Block;
+import lockmanager.Lock;
 
 import java.io.IOException;
 import java.nio.channels.FileChannel;
@@ -24,6 +25,8 @@ public class Xaction {
     private Thread executingThread;
 
     private long id;
+
+    private Lock lockingMode;
 
     Map<FileChannel, Map<Integer, Block>> usingBlocks = new HashMap<>();
 
@@ -98,6 +101,14 @@ public class Xaction {
             return null;
 
         return usingBlocks.get(channel).get(blockNum);
+    }
+
+    public Lock getLockingMode() {
+        return lockingMode;
+    }
+
+    public void setLockingMode(Lock lockingMode) {
+        this.lockingMode = lockingMode;
     }
 
     public long getId(){

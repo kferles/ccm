@@ -34,7 +34,7 @@ public class LockMode {
     private Pair<Xaction, Lock> isInUpdateMode(Xaction xaction){
         Pair<Xaction, Lock> key = new Pair<>(xaction, Lock.SIX);
         if(xactionList.contains(key)){
-            return key;
+            return xactionList.get(xactionList.indexOf(key));
         }
         return null;
     }

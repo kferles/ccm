@@ -13,7 +13,10 @@ import file.record.RecordFactory;
 import file.record.SerializableRecord;
 import file.recordfile.HeapRecordFile;
 import file.recordfile.RecordPointer;
+import lockmanager.Lock;
+import lockmanager.LockManager;
 import util.Pair;
+import xaction.Xaction;
 
 import static util.FileSystemMethods.exists;
 import static util.FileSystemMethods.getPath;
@@ -53,6 +56,8 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
     private static final int LEAF_NODE_PTR_SIZE = 8;
 
     private static final int NEXT_LEAF_NODE_OFFSET = NODE_METADATA_SIZE;
+
+    private static final LockManager lockManager = LockManager.getInstance();
 
     private HeapRecordFile<R> recordFile;
 
@@ -627,6 +632,10 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
     }
 
     public R get(K key) throws IOException, InvalidRecordSize {
+
+        Xaction currXaction = Xaction.getExecutingXaction();
+        currXaction.setLockingMode(Lock.S);
+
         Block header = indexFile.loadBlock(0);
         int rootBlockNum = getRootBlock(header);
         if(rootBlockNum == -1)
@@ -637,19 +646,23 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
     }
 
     public void insert(K key, R record) throws IOException, InvalidRecordException {
+
+        Xaction currXaction = Xaction.getExecutingXaction();
+        currXaction.setLockingMode(Lock.SIX);
+
         Block header = indexFile.loadBlock(0);
 
         int rootBlockNum = getRootBlock(header);
         Block root;
 
         if(rootBlockNum == -1){
+            currXaction.setLockingMode(Lock.X);
+            lockManager.updateSIXLock(indexFile, 0);
             root = indexFile.allocateNewBlock();
         }
         else{
             root = indexFile.loadBlock(rootBlockNum);
         }
-
-        RecordPointer heapPtr = recordFile.insertRecord(record);
 
         if(rootBlockNum == -1){
             new LeafNode(root, -1);
@@ -663,9 +676,22 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
         if(insertLeaf.getNumOfPointers() > 0 && insertLeaf.findKey(key) != null)
             throw new InvalidRecordException("Record with key: " + key + " already exists");
 
-        if(!insertLeaf.isFull())
+        Lock prevMode = currXaction.getLockingMode();
+        currXaction.setLockingMode(Lock.X);
+        RecordPointer heapPtr = recordFile.insertRecord(record);
+
+        if(prevMode == Lock.SIX)
+            lockManager.updateSIXLock(indexFile, insertLeaf.getBlockNum());
+
+        if(!insertLeaf.isFull()){
             insertLeaf.insertPointer(key, heapPtr);
+        }
         else{
+            //prevMode == Lock.X happens only when tree is empty
+            assert prevMode == Lock.SIX;
+
+            lockManager.updateSIXLock(indexFile, 0);
+
             int leafNext = insertLeaf.getNextLeaf();
             LeafNode newLeaf = new LeafNode(indexFile.allocateNewBlock(), leafNext);
 
@@ -680,6 +706,7 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
             if(!pathFromRoot.isEmpty()){
                 for(int i = pathFromRoot.size() - 1; i >= 0; --i){
                     InnerNode currNode = pathFromRoot.get(i);
+                    lockManager.updateSIXLock(indexFile, currNode.getBlockNum());
                     if(!currNode.isFull()){
                         currNode.insertKey(splitKey, gtePtr);
                         break;
@@ -715,6 +742,11 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
     }
 
     public void update(R updatedRec) throws IOException, InvalidRecordException {
+
+        Xaction currXaction = Xaction.getExecutingXaction();
+
+        currXaction.setLockingMode(Lock.S);
+
         K key = updatedRec.getId();
 
         Block header = indexFile.loadBlock(0);
@@ -732,10 +764,15 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
         if(recPtr == null)
             throw new InvalidRecordException("Record with key: " + key + " does not exist");
 
+        currXaction.setLockingMode(Lock.X);
         recordFile.updateRecord(recPtr.first, updatedRec);
     }
 
     public ArrayList<R> recordsInRange(K key1, K key2) throws IOException, InvalidRecordSize {
+
+        Xaction currXaction = Xaction.getExecutingXaction();
+
+        currXaction.setLockingMode(Lock.S);
 
         ArrayList<R> rv = new ArrayList<>();
 
@@ -825,6 +862,7 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
                                    InnerNode rAnchor, Block leftNode, Block rightNode) throws IOException,
             InvalidBlockException, InvalidRecordException {
 
+        Xaction currXaction = Xaction.getExecutingXaction();
         if(isInnerNode(curr)){
             InnerNode currInner = new InnerNode(curr, false);
 
@@ -868,6 +906,9 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
                                            nextLeft, nextRight);
 
             if(rmPtr != -1){
+
+                lockManager.updateSIXLock(indexFile, currInner.getBlockNum());
+
                 //deleting from inner node
                 int keyToRemove = currInner.findPointerOffset(rmPtr);
 
@@ -889,6 +930,7 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
                         //deleting from root
                         if(currInner.getNumOfPointers() == 1){
                             //collapsing root
+                            lockManager.updateSIXLock(indexFile, 0);
                             int newRoot = currInner.getPointer(0);
                             Block header = indexFile.loadBlock(0);
                             header.putInt(ROOT_POINTER_OFFSET, newRoot);
@@ -928,6 +970,9 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
                     int pointersInBalanceNode = balanceNode.getNumOfPointers();
 
                     if(pointersInBalanceNode > threshold){
+                        lockManager.updateSIXLock(indexFile, balanceNode.getBlockNum());
+                        lockManager.updateSIXLock(indexFile, anchorNode.getBlockNum());
+
                         //borrowing from balance node
                         K separatorVal;
 
@@ -997,6 +1042,9 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
                             mergeNode = new InnerNode(leftNode, false);
                         }
 
+                        lockManager.updateSIXLock(indexFile, mergeNode.getBlockNum());
+                        lockManager.updateSIXLock(indexFile, currInner.getBlockNum());
+
                         K sep = currInner.getKey(0);
                         int parentsSepIndex = parent.nextPointersIndex(sep);
                         assert parentsSepIndex > 0;
@@ -1030,6 +1078,9 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
             if(rec == null)
                 throw new InvalidRecordException("Record with key: " + key + " does not exist");
 
+            currXaction.setLockingMode(Lock.X);
+            lockManager.updateSIXLock(indexFile, leaf.getBlockNum());
+
             recordFile.deleteRecord(rec.first);
             leaf.removeKey(rec.second);
 
@@ -1042,6 +1093,7 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
                 if(rightNode == null && leftNode == null){
                     //deleting from root
                     if(numOfPointers == 0){
+                        lockManager.updateSIXLock(indexFile, 0);
                         indexFile.disposeBlock(curr);
                         Block header = indexFile.loadBlock(0);
                         header.putInt(ROOT_POINTER_OFFSET, -1);
@@ -1074,6 +1126,8 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
 
                 int balanceLeafPointers = balanceLeaf.getNumOfPointers();
 
+                lockManager.updateSIXLock(indexFile, balanceLeaf.getBlockNum());
+
                 if(balanceLeafPointers > threshold){
                     //borrowing from neighbor
                     int splitNum = numOfPointers + balanceLeafPointers >>> 1;
@@ -1105,6 +1159,8 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
                     else
                         anchor = lAnchor;
 
+                    lockManager.updateSIXLock(indexFile, anchor.getBlockNum());
+
                     K newSepVal;
 
                     if(balanceLeaf.block == rightNode)
@@ -1132,6 +1188,9 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
                         mergeLeaf = new LeafNode(leftNode);
                     }
 
+                    lockManager.updateSIXLock(indexFile, leaf.getBlockNum());
+                    lockManager.updateSIXLock(indexFile, mergeLeaf.getBlockNum());
+
                     for(int i = 0; i < leaf.getNumOfPointers(); ++i){
                         Pair<RecordPointer, K> ptr = leaf.getPointer(i);
                         mergeLeaf.insertPointer(ptr.second, ptr.first);
@@ -1152,6 +1211,10 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
     }
 
     public void delete(K key) throws IOException, InvalidBlockException, InvalidRecordException {
+
+        Xaction currXaction = Xaction.getExecutingXaction();
+        currXaction.setLockingMode(Lock.SIX);
+
         Block header = indexFile.loadBlock(0);
 
         int rootBlockNum = getRootBlock(header);

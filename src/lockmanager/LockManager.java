@@ -98,7 +98,7 @@ public class LockManager {
         }
     }
 
-    public void updateLock(BlockFile bf, Integer num){
+    public void updateSIXLock(BlockFile bf, Integer num){
         Xaction currXaction = Xaction.getExecutingXaction();
         Pair<BlockFile, Integer> updateLock = new Pair<>(bf, num);
         WaitObject waitObj = null;
@@ -107,6 +107,9 @@ public class LockManager {
             assert lockTable.containsKey(updateLock);
 
             LockMode mode = lockTable.get(updateLock);
+
+            if(mode.xactionList.contains(new Pair<>(currXaction, Lock.X)))
+                return;
 
             assert mode.xactionList.contains(new Pair<>(currXaction, Lock.SIX));
 
@@ -128,6 +131,63 @@ public class LockManager {
 
         if(waitObj != null)
             waitObj.waitForLock();
+    }
+
+    public void updateSLock(BlockFile bf, Integer num){
+        Xaction currXaction = Xaction.getExecutingXaction();
+        Pair<BlockFile, Integer> updateLock = new Pair<>(bf, num);
+        Lock newMode = currXaction.getLockingMode();
+        WaitObject waitObj = null;
+
+        synchronized(this){
+            assert lockTable.containsKey(updateLock);
+
+            LockMode mode = lockTable.get(updateLock);
+
+            Pair<Xaction, Lock> keyLock = new Pair<>(currXaction, Lock.S);
+            assert mode.xactionList.contains(keyLock);
+
+            if(newMode == Lock.SIX){
+                mode.xactionList.get(mode.xactionList.indexOf(keyLock)).second = Lock.SIX;
+            }
+            else{
+                assert newMode == Lock.X;
+                if(mode.xactionList.size() == 1){
+                    mode.addXaction(currXaction);
+                }
+                else{
+                    waitObj = new WaitObject(currXaction);
+
+                    if(!waitTable.containsKey(updateLock))
+                        waitTable.put(updateLock, new ArrayList<WaitObject>());
+
+                    List<WaitObject> waitObjs = waitTable.get(updateLock);
+
+                    //TODO: should we give priority to updaters?
+                    waitObjs.add(waitObj);
+                }
+            }
+        }
+
+        if(waitObj != null)
+            waitObj.waitForLock();
+    }
+
+    public synchronized Lock getModeFor(BlockFile bf, Integer num){
+        Xaction xaction = Xaction.getExecutingXaction();
+
+        Pair<BlockFile, Integer> key = new Pair<>(bf, num);
+        assert lockTable.containsKey(key);
+
+        LockMode mode = lockTable.get(key);
+        Lock rv = null;
+        for(Pair<Xaction, Lock> owningXaction : mode.xactionList){
+            if(owningXaction.first.equals(xaction)){
+                rv = owningXaction.second;
+            }
+        }
+        assert rv != null;
+        return rv;
     }
 
 }

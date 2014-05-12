@@ -108,10 +108,11 @@ public class Block {
     }
 
     public void forceDispose() throws IOException, InvalidBlockException {
-        this.bf.disposeBlock(this);
-        Block header = this.bf.loadBlock(0);
-        this.writeToFile();
-        header.writeToFile();
+        this.bf.forceDispose(this);
+    }
+
+    public BlockFile getBlockFile(){
+        return this.bf;
     }
 
     @Override

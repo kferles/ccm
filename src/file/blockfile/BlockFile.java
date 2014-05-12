@@ -3,6 +3,9 @@ package file.blockfile;
 import buffermanager.BufferManager;
 import config.ConfigParameters;
 import exception.InvalidBlockException;
+import lockmanager.Lock;
+import lockmanager.LockManager;
+import xaction.Xaction;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -34,6 +37,8 @@ public final class BlockFile {
     private static final byte ACTIVE_BLOCK = 1;
 
     private static final byte FREE_BLOCK = 0;
+
+    private static final LockManager lockManager = LockManager.getInstance();
 
     private FileChannel channel;
 
@@ -112,6 +117,29 @@ public final class BlockFile {
 
     public Block loadBlock(int num) throws IOException {
 
+        Xaction currXaction = Xaction.getExecutingXaction();
+        Lock currMode = currXaction.getLockingMode();
+
+        if(currXaction.contains(channel, num)){
+            Lock oldMode = lockManager.getModeFor(this, num);
+
+            //If oldMode is X then this xaction can proceed in any mode
+            if(currMode != oldMode && oldMode != Lock.X){
+                if(oldMode == Lock.S){
+                    lockManager.updateSLock(this, num);
+                }
+
+                if(oldMode == Lock.SIX){
+                    if(currMode == Lock.X){
+                        lockManager.updateSIXLock(this, num);
+                    }
+                }
+            }
+            return currXaction.get(channel, num);
+        }
+
+        lockManager.getLock(this, num);
+
         return bufManager.getBlock(this, num, false);
     }
 
@@ -151,6 +179,22 @@ public final class BlockFile {
 
     }
 
+    public void forceDispose(Block block) throws IOException, InvalidBlockException {
+
+        byte active = block.getByte(ACTIVE_BLOCK_OFFSET);
+
+        if(active != ACTIVE_BLOCK)
+            throw new InvalidBlockException("Trying to dispose a free block");
+
+        //bypass buffer manager
+        ByteBuffer buff = ByteBuffer.allocateDirect(bufferSize);
+        this.channel.read(buff, 0);
+        Block header = new Block(0, buff, this, false);
+        updateFreeListHead(header, block);
+        header.writeToFile();
+        block.writeToFile();
+    }
+
     public Block allocateNewBlock() throws IOException {
         Block header = loadBlock(0);
         Block rv = popFreeListHead(header);
@@ -160,6 +204,7 @@ public final class BlockFile {
             int numOfBlocks = getNumOfBlocks(header);
             updateNumOfBlocks(header, ++numOfBlocks);
 
+            lockManager.getLock(this, numOfBlocks);
             rv = bufManager.getBlock(this, numOfBlocks, true);
             newBlock = true;
         }
@@ -193,4 +238,20 @@ public final class BlockFile {
         return rv.toString();
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        BlockFile blockFile = (BlockFile) o;
+
+        if (!channel.equals(blockFile.channel)) return false;
+
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        return channel.hashCode();
+    }
 }

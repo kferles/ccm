@@ -8,6 +8,7 @@ import xaction.Xaction;
 
 public class LockMode {
 
+    //TODO: we can easily convert this guy to a Map
     List<Pair<Xaction, Lock>> xactionList = new ArrayList<>();
 
     synchronized boolean canProceed(Xaction currXaction){
@@ -32,9 +33,13 @@ public class LockMode {
     }
 
     private Pair<Xaction, Lock> isInUpdateMode(Xaction xaction){
-        Pair<Xaction, Lock> key = new Pair<>(xaction, Lock.SIX);
-        if(xactionList.contains(key)){
-            return xactionList.get(xactionList.indexOf(key));
+        Pair<Xaction, Lock> key1 = new Pair<>(xaction, Lock.SIX);
+        Pair<Xaction, Lock> key2 = new Pair<>(xaction, Lock.S);
+        if(xactionList.contains(key1)){
+            return xactionList.get(xactionList.indexOf(key1));
+        }
+        if(xactionList.contains(key2)){
+            return xactionList.get(xactionList.indexOf(key2));
         }
         return null;
     }

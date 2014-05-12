@@ -89,8 +89,6 @@ public class BufferManager {
 
         FileChannel channel = bf.getChannel();
 
-        if(currXaction.contains(channel, number))
-            return currXaction.get(channel, number);
         if(!newBlock){
             Block rv = checkCachedBlocks(channel, number);
             if(rv != null){

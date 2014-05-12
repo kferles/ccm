@@ -2,7 +2,10 @@ package xaction;
 
 import exception.InvalidBlockException;
 import file.blockfile.Block;
+import file.blockfile.BlockFile;
 import lockmanager.Lock;
+import lockmanager.LockManager;
+import util.Pair;
 
 import java.io.IOException;
 import java.nio.channels.FileChannel;
@@ -13,6 +16,8 @@ import java.util.concurrent.ConcurrentMap;
 public class Xaction {
 
     private static final ConcurrentMap<Long, Xaction> activeXactions = new ConcurrentHashMap<>();
+
+    private static final LockManager lockManager = LockManager.getInstance();
 
     public static Xaction getExecutingXaction(){
         return activeXactions.get(Thread.currentThread().getId());
@@ -47,16 +52,16 @@ public class Xaction {
 
     public void commit() throws IOException, InvalidBlockException {
         for(FileChannel channel : usingBlocks.keySet()){
-            Map<Integer, Block> blks = usingBlocks.get(channel);
-            for(Integer num : blks.keySet()){
-                Block block = blks.get(num);
+            Map<Integer, Block> blocks = usingBlocks.get(channel);
+            for(Integer num : blocks.keySet()){
+                Block block = blocks.get(num);
                 block.commit();
+                lockManager.releaseLock(block.getBlockFile(), block.getBlockNum());
             }
         }
     }
 
     public void rollback() throws IOException {
-        //TODO: do not release locks for metadata before forceDispose calls
         List<Block> newBlocks = new ArrayList<>();
         for(FileChannel channel : usingBlocks.keySet()){
             Map<Integer, Block> blocks = usingBlocks.get(channel);
@@ -64,15 +69,25 @@ public class Xaction {
                 Block block = blocks.get(num);
                 if(block.isNewBlock())
                     newBlocks.add(block);
-                block.invalidate();
+                else
+                    block.invalidate();
             }
         }
 
         for(Block newBlock : newBlocks){
             try {
                 newBlock.forceDispose();
+                newBlock.invalidate();
             } catch (InvalidBlockException _) {
                 assert false;
+            }
+        }
+
+        for(FileChannel channel : usingBlocks.keySet()){
+            Map<Integer, Block> blocks = usingBlocks.get(channel);
+            for(Integer num : blocks.keySet()){
+                Block block = blocks.get(num);
+                lockManager.releaseLock(block.getBlockFile(), num);
             }
         }
     }
@@ -115,4 +130,20 @@ public class Xaction {
         return this.id;
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        Xaction xaction = (Xaction) o;
+
+        if (!executingThread.equals(xaction.executingThread)) return false;
+
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        return executingThread.hashCode();
+    }
 }

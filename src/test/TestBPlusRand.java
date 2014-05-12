@@ -47,7 +47,6 @@ public class TestBPlusRand {
                 Integer id = r.nextInt();
                 while(genIds.contains(id))
                     id = r.nextInt();
-                System.out.println(i + ":" + id);
                 genIds.add(id);
                 genIdsOrdered.add(id);
 

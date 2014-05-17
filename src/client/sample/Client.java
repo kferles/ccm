@@ -26,15 +26,18 @@ public class Client implements Runnable{
             Client cl = new Client(new BaseXactionTask("localhost", 2345) {
                 @Override
                 public void runXaction() throws IOException, ClassNotFoundException, RemoteFailure {
-                    dispatcher.beginXaction();
+                    beginXaction();
                     try {
-                        System.out.println(dispatcher.recordsInRange(0, 2));
+                        insert(new EmployeeRecord(1, "Katerina", "Zamani"));
+                        insert(new EmployeeRecord(7, "Kostas", "Ferles"));
+                        System.out.println(recordsInRange(0, 6));
+                        commit();
                     }
-                    catch (InvalidRecordSize invalidRecordSize) {
+                    catch (InvalidRecordException | InvalidRecordSize invalidRecordSize) {
+                        rollback();
                         invalidRecordSize.printStackTrace();
                     }
-                    dispatcher.commit();
-                    dispatcher.endXaction();
+                    endXaction();
                 }
             });
 

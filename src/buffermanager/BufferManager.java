@@ -103,7 +103,9 @@ public class BufferManager {
             try {
                 wait();
             }
-            catch (InterruptedException _) { }
+            catch (InterruptedException _) {
+                Thread.currentThread().interrupt();
+            }
         }
 
         if(!availableBuffers.isEmpty())

@@ -801,7 +801,6 @@ public class BPlusIndex<K extends Comparable<K>, R extends SerializableRecord &
             return rv;
         }
 
-        //TODO: I have to also lock all the interim nodes at each level in order to assure isolation
         InnerNode innerRoot = new InnerNode(root, false);
         int lowPtr = innerRoot.getPointer(innerRoot.nextPointersIndex(key1)),
             highPtr = innerRoot.getPointer(innerRoot.nextPointersIndex(key2));

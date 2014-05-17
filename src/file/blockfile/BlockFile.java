@@ -156,6 +156,9 @@ public final class BlockFile {
         else{
             bufManager.invalidateBlock(block);
         }
+
+        if(block.isNewBlock())
+            block.setNewBlock(false);
     }
 
     public void invalidateBlock(Block block) throws IOException{

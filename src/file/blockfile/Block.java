@@ -14,6 +14,8 @@ public class Block {
 
     private static final int bufferSize = ConfigParameters.getInstance().getBufferSize();
 
+    private static final boolean durableWrites = ConfigParameters.getInstance().isDurable();
+
     private final BlockFile bf;
 
     private final FileChannel channel;
@@ -87,6 +89,10 @@ public class Block {
         return newBlock;
     }
 
+    public void setNewBlock(boolean newBlock) {
+        this.newBlock = newBlock;
+    }
+
     public void writeToFile() throws IOException {
         assert this.blockNum >= 0;
         assert this.dirty;
@@ -95,7 +101,10 @@ public class Block {
         channel.position(bufferSize*blockNum);
         while (buffer.hasRemaining())
             channel.write(buffer);
-        channel.force(true);
+
+        if(durableWrites)
+            channel.force(true);
+
         this.dirty = false;
     }
 

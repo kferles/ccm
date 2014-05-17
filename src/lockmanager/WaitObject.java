@@ -1,5 +1,6 @@
 package lockmanager;
 
+import exception.RestartException;
 import xaction.Xaction;
 
 public class WaitObject {
@@ -29,12 +30,12 @@ public class WaitObject {
             try {
                 wait();
             } catch (InterruptedException _) {
-
+                Thread.currentThread().interrupt();
             }
         }
 
         if(restart){
-            //TODO: restart xaction
+            throw new RestartException();
         }
     }
 

@@ -10,6 +10,8 @@ public class ConfigParameters {
 
     private int maxBuffNumber = 100;
 
+    private boolean durable = false;
+
     private ConfigParameters() {
     }
 
@@ -31,6 +33,14 @@ public class ConfigParameters {
 
     public void setMaxBuffNumber(int maxBuffNumber) {
         this.maxBuffNumber = maxBuffNumber;
+    }
+
+    public boolean isDurable() {
+        return durable;
+    }
+
+    public void setDurable(boolean durable) {
+        this.durable = durable;
     }
 
 }

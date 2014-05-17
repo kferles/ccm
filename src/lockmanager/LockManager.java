@@ -9,6 +9,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import deadlockmanager.DeadlockManager;
+
 public class LockManager {
 
     private static LockManager ourInstance = new LockManager();
@@ -20,6 +22,8 @@ public class LockManager {
     Map<Pair<BlockFile, Integer>, LockMode> lockTable = new HashMap<>();
 
     Map<Pair<BlockFile,Integer>, List<WaitObject>> waitTable = new HashMap<>();
+
+    DeadlockManager deadlock = DeadlockManager.getInstance();
 
     public void getLock(BlockFile bf, Integer num){
         Xaction xaction = Xaction.getExecutingXaction();
@@ -41,6 +45,7 @@ public class LockManager {
                     waitTable.put(lockRequest, new ArrayList<WaitObject>());
 
                 waitTable.get(lockRequest).add(waitObj);
+                deadlock.addNewPart(currMode.xactionList, waitObj);
             }
         }
 
@@ -57,8 +62,20 @@ public class LockManager {
         LockMode mode = lockTable.get(lockRelease);
 
         Lock acqLockMode = mode.removeXaction(xaction);
+        deadlock.removeVertexPart(xaction);
 
-        if(mode.xactionList.isEmpty() && waitTable.containsKey(lockRelease)){
+        boolean notifyWaiters = false;
+        if(waitTable.containsKey(lockRelease)){
+            if(mode.xactionList.isEmpty())
+                notifyWaiters = true;
+            else if(mode.xactionList.size() == 1){
+                Xaction waitingXaction = waitTable.get(lockRelease).get(0).getWaitingXaction();
+                if(mode.xactionList.get(0).first.equals(waitingXaction))
+                    notifyWaiters = true;
+            }
+        }
+
+        if(notifyWaiters){
             List<WaitObject> waitingXactions = waitTable.get(lockRelease);
 
             if(waitingXactions.size() > 0){
@@ -70,6 +87,8 @@ public class LockManager {
                     if(currMode == Lock.X){
                         mode.addXaction(currWaitingXaction);
                         waitingXactions.remove(0);
+                        deadlock.removeWaitPart(mode.xactionList, currWait);
+
                         currWait.setContinue();
                         currWait.notifyWaitingXaction();
                         return;
@@ -78,6 +97,8 @@ public class LockManager {
                     do{
                         mode.addXaction(currWaitingXaction);
                         waitingXactions.remove(0);
+                        deadlock.removeWaitPart(mode.xactionList, currWait);
+
                         currWait.setContinue();
                         currWait.notifyWaitingXaction();
 
@@ -91,6 +112,8 @@ public class LockManager {
 
                     mode.addXaction(headWait.getWaitingXaction());
                     waitingXactions.remove(0);
+                    deadlock.removeWaitPart(mode.xactionList, headWait);
+
                     headWait.setContinue();
                     headWait.notifyWaitingXaction();
                 }
@@ -124,8 +147,13 @@ public class LockManager {
 
                 List<WaitObject> waitObjs = waitTable.get(updateLock);
 
-                //TODO: should we give priority to updaters?
-                waitObjs.add(waitObj);
+                /*
+                 * If an updater has to wait, we put the xaction
+                 * in the front of the list to be able to recognise
+                 * it during release block.
+                 */
+                waitObjs.add(0, waitObj);
+                deadlock.addNewPart(mode.xactionList, waitObj);
             }
         }
 
@@ -163,8 +191,13 @@ public class LockManager {
 
                     List<WaitObject> waitObjs = waitTable.get(updateLock);
 
-                    //TODO: should we give priority to updaters?
-                    waitObjs.add(waitObj);
+                    /*
+                     * If an updater has to wait, we put the xaction
+                     * in the front of the list to be able to recognise
+                     * it during release block.
+                     */
+                    waitObjs.add(0, waitObj);
+                    deadlock.addNewPart(mode.xactionList, waitObj);
                 }
             }
         }

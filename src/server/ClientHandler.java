@@ -1,9 +1,6 @@
 package server;
 
-import exception.InvalidBlockException;
-import exception.InvalidRecordException;
-import exception.InvalidRecordSize;
-import exception.InvalidRequestException;
+import exception.*;
 import file.index.BPlusIndex;
 import file.record.Identifiable;
 import file.record.SerializableRecord;
@@ -62,6 +59,7 @@ public class ClientHandler<K extends Comparable<K>, R extends SerializableRecord
                 catch (InvalidRecordException e) {
                     objOutStream.writeObject(ResponseType.INSERT_KEY_EXISTS);
                     objOutStream.writeObject(e.getMessage());
+                    break;
                 }
                 objOutStream.writeObject(ResponseType.INSERT_SUCCESS);
                 break;
@@ -77,6 +75,7 @@ public class ClientHandler<K extends Comparable<K>, R extends SerializableRecord
                 catch(InvalidRecordException e){
                     objOutStream.writeObject(ResponseType.DELETE_KEY_DOES_NOT_EXIST);
                     objOutStream.writeObject(e.getMessage());
+                    break;
                 }
 
                 objOutStream.writeObject(ResponseType.DELETE_SUCCESS);
@@ -86,13 +85,14 @@ public class ClientHandler<K extends Comparable<K>, R extends SerializableRecord
                 assert Xaction.isXactionExecuting(clientsXaction);
 
                 K lookupKey = keyClass.cast(objInStream.readObject());
-                R getRec = null;
+                R getRec;
 
                 try {
                     getRec = index.get(lookupKey);
                 } catch (InvalidRecordSize invalidRecordSize) {
                     objOutStream.writeObject(ResponseType.GET_FAILURE);
                     objOutStream.writeObject(invalidRecordSize.getMessage());
+                    break;
                 }
 
                 if(getRec == null){
@@ -114,6 +114,7 @@ public class ClientHandler<K extends Comparable<K>, R extends SerializableRecord
                 } catch (InvalidRecordException e) {
                     objOutStream.writeObject(ResponseType.UPDATE_FAILURE);
                     objOutStream.writeObject(e.getMessage());
+                    break;
                 }
                 objOutStream.writeObject(ResponseType.UPDATE_SUCESS);
                 break;
@@ -123,13 +124,14 @@ public class ClientHandler<K extends Comparable<K>, R extends SerializableRecord
 
                 K rangeKeyLow = keyClass.cast(objInStream.readObject());
                 K rangeKeyHigh = keyClass.cast(objInStream.readObject());
-                ArrayList<R> rv = null;
+                ArrayList<R> rv;
 
                 try {
                     rv = index.recordsInRange(rangeKeyLow, rangeKeyHigh);
                 } catch (InvalidRecordSize invalidRecordSize) {
                     objOutStream.writeObject(ResponseType.RANGE_FAILURE);
                     objOutStream.writeObject(invalidRecordSize.getMessage());
+                    break;
                 }
                 objOutStream.writeObject(ResponseType.RANGE_SUCCESS);
                 objOutStream.writeObject(rv);
@@ -203,15 +205,21 @@ public class ClientHandler<K extends Comparable<K>, R extends SerializableRecord
             finalResponse = ResponseType.INVALID_REQUEST;
             finalMsg = "Invalid request";
         }
+        catch(RestartException _){
+            finalResponse = ResponseType.RESTART;
+        }
         catch(Exception _){
             finalResponse = ResponseType.UNEXPECTED_FAILURE;
             finalMsg = "Server terminated unexpectedly";
         }
 
         try {
-            if(finalResponse != null && finalMsg != null){
+            if(finalResponse != null){
+                clientsXaction.rollback();
+                clientsXaction.end();
                 objOutStream.writeObject(finalResponse);
-                objOutStream.writeObject(finalMsg);
+                if(finalMsg != null)
+                    objOutStream.writeObject(finalMsg);
                 objOutStream.flush();
             }
             objOutStream.close();

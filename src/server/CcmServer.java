@@ -2,8 +2,6 @@ package server;
 
 import config.ConfigParameters;
 import deadlockmanager.DeadlockManager;
-import exception.InvalidKeyFactoryException;
-import exception.InvalidRecordSize;
 import file.index.BPlusIndex;
 import file.record.sample.EmployeeFactory;
 import file.record.sample.EmployeeKeyValFactory;

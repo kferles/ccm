@@ -8,4 +8,6 @@ public interface XactionTask {
 
     public void runXaction() throws IOException, ClassNotFoundException,
                                     RemoteFailure;
+
+    public void closeConnections();
 }

@@ -26,6 +26,7 @@ public class XactionExecutor {
                     break begin;
             }
         }
+        task.closeConnections();
     }
 
 }

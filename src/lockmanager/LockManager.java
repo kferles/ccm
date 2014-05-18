@@ -1,5 +1,6 @@
 package lockmanager;
 
+import deadlockmanager.DeadlockManager;
 import file.blockfile.BlockFile;
 import util.Pair;
 import xaction.Xaction;
@@ -9,9 +10,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import deadlockmanager.DeadlockManager;
-
 public class LockManager {
+
+    private LockManager(){ }
 
     private static LockManager ourInstance = new LockManager();
 
@@ -24,6 +25,13 @@ public class LockManager {
     Map<Pair<BlockFile,Integer>, List<WaitObject>> waitTable = new HashMap<>();
 
     DeadlockManager deadlock = DeadlockManager.getInstance();
+
+    private void updateWaitGraph(List<WaitObject> alreadyWaiting,
+                                 List<Pair<Xaction, Lock>> owningXactions){
+        for(WaitObject waitObj : alreadyWaiting){
+            deadlock.addNewPart(owningXactions, waitObj);
+        }
+    }
 
     public void getLock(BlockFile bf, Integer num){
         Xaction xaction = Xaction.getExecutingXaction();
@@ -47,6 +55,12 @@ public class LockManager {
                 waitTable.get(lockRequest).add(waitObj);
                 deadlock.addNewPart(currMode.xactionList, waitObj);
             }
+            else{
+                if(waitTable.containsKey(lockRequest)){
+                    List<WaitObject> waitObjects = waitTable.get(lockRequest);
+                    updateWaitGraph(waitObjects, currMode.xactionList);
+                }
+            }
         }
 
         if(waitObj != null)
@@ -66,10 +80,21 @@ public class LockManager {
 
         boolean notifyWaiters = false;
         if(waitTable.containsKey(lockRelease)){
+            List<WaitObject> waitingXactions = waitTable.get(lockRelease);
+            if(!waitingXactions.isEmpty()){
+                for(int i = 0, end = waitingXactions.size(); i < end; ++i){
+                    WaitObject waitObj = waitingXactions.get(i);
+                    if(waitObj.getWaitingXaction().equals(xaction)){
+                        waitingXactions.remove(i);
+                        break;
+                    }
+                }
+            }
+
             if(mode.xactionList.isEmpty())
                 notifyWaiters = true;
-            else if(mode.xactionList.size() == 1){
-                Xaction waitingXaction = waitTable.get(lockRelease).get(0).getWaitingXaction();
+            else if(mode.xactionList.size() == 1 && !waitingXactions.isEmpty()){
+                Xaction waitingXaction = waitingXactions.get(0).getWaitingXaction();
                 if(mode.xactionList.get(0).first.equals(waitingXaction))
                     notifyWaiters = true;
             }
@@ -84,27 +109,36 @@ public class LockManager {
                     Lock currMode = currWait.getMode();
                     Xaction currWaitingXaction = currWait.getWaitingXaction();
 
-                    if(currMode == Lock.X){
-                        mode.addXaction(currWaitingXaction);
-                        waitingXactions.remove(0);
-                        deadlock.removeWaitPart(mode.xactionList, currWait);
+                    if(!waitingXactions.isEmpty()){
+                        if(currMode == Lock.X){
+                            mode.addXaction(currWaitingXaction);
+                            waitingXactions.remove(0);
 
-                        currWait.setContinue();
-                        currWait.notifyWaitingXaction();
-                        return;
+                            deadlock.removeWaitPart(mode.xactionList, currWait);
+                            updateWaitGraph(waitingXactions, mode.xactionList);
+
+                            currWait.setContinue();
+                            currWait.notifyWaitingXaction();
+                            return;
+                        }
+
+                        do{
+                            mode.addXaction(currWaitingXaction);
+                            waitingXactions.remove(0);
+
+                            deadlock.removeWaitPart(mode.xactionList, currWait);
+                            updateWaitGraph(waitingXactions, mode.xactionList);
+
+                            currWait.setContinue();
+                            currWait.notifyWaitingXaction();
+
+                            if(waitingXactions.isEmpty())
+                                break;
+
+                            currWait = waitingXactions.get(0);
+                            currWaitingXaction = currWait.getWaitingXaction();
+                        }while(currWait.getMode() != Lock.X);
                     }
-
-                    do{
-                        mode.addXaction(currWaitingXaction);
-                        waitingXactions.remove(0);
-                        deadlock.removeWaitPart(mode.xactionList, currWait);
-
-                        currWait.setContinue();
-                        currWait.notifyWaitingXaction();
-
-                        currWait = waitingXactions.get(0);
-                        currWaitingXaction = currWait.getWaitingXaction();
-                    }while(currWait.getMode() != Lock.X);
                 }
                 else{
                     WaitObject headWait = waitingXactions.get(0);
@@ -204,6 +238,18 @@ public class LockManager {
 
         if(waitObj != null)
             waitObj.waitForLock();
+    }
+
+    public synchronized void removeXactionFromWaitList(Xaction xaction){
+        for(Pair<BlockFile,Integer> blk : waitTable.keySet()){
+            List<WaitObject> waitObjs = waitTable.get(blk);
+            for(WaitObject obj : waitObjs){
+                if(obj.getWaitingXaction().equals(xaction)){
+                    waitObjs.remove(obj);
+                    return;
+                }
+            }
+        }
     }
 
     public synchronized Lock getModeFor(BlockFile bf, Integer num){

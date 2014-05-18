@@ -93,7 +93,7 @@ public class CcmServer implements Runnable {
 
             final CcmServer server = new CcmServer(port, index);
             final Thread mainThread = Thread.currentThread();
-            final Thread deadlockManagerThread = new Thread(new DeadlockManager());
+            final Thread deadlockManagerThread = new Thread(DeadlockManager.getInstance());
 
             Runtime.getRuntime().addShutdownHook(new Thread(){
                 @Override

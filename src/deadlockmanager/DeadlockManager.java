@@ -25,6 +25,8 @@ public class DeadlockManager extends Thread{
 		return ourInstance;
 	}
 
+    private boolean deadlockDetectionRunning = false;
+
 	private DirectedGraph<Xaction, DefaultEdge> graph = new DefaultDirectedGraph<>(DefaultEdge.class);
 	// includes the transactions that wait
 	private Map<Xaction, WaitObject> waitObjMap = new HashMap<>();
@@ -77,13 +79,17 @@ public class DeadlockManager extends Thread{
 	}
 
 	private synchronized void detectAllCycles() {
+        deadlockDetectionRunning = true;
 		// based on Johnson's algorithm for cycles in a graph
 		JohnsonSimpleCycles<Xaction, DefaultEdge> detector = new JohnsonSimpleCycles<>(this.graph);
 
 		List<List<Xaction>> cycleList = detector.findSimpleCycles();
 
-		if(cycleList.isEmpty()) 
+		if(cycleList.isEmpty()){
+            deadlockDetectionRunning = false;
+            notifyAll();
 			return;
+        }
 
 		List<Xaction> removeList = new ArrayList<>();
 
@@ -104,7 +110,18 @@ public class DeadlockManager extends Thread{
 			}
 		}
 
+        deadlockDetectionRunning = false;
+        notifyAll();
 	}
+
+    public synchronized void waitForDeadlockManager(){
+        while(deadlockDetectionRunning)
+            try {
+                wait();
+            } catch (InterruptedException _) {
+                Thread.currentThread().interrupt();
+            }
+    }
 
 	@Override
 	public void run() {

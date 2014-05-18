@@ -1,5 +1,6 @@
 package server;
 
+import deadlockmanager.DeadlockManager;
 import exception.*;
 import file.index.BPlusIndex;
 import file.record.Identifiable;
@@ -186,6 +187,8 @@ public class ClientHandler<K extends Comparable<K>, R extends SerializableRecord
 
     @Override
     public void run() {
+
+        DeadlockManager.getInstance().waitForDeadlockManager();
 
         RequestType req;
         ResponseType finalResponse = null;

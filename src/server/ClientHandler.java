@@ -4,6 +4,7 @@ import exception.*;
 import file.index.BPlusIndex;
 import file.record.Identifiable;
 import file.record.SerializableRecord;
+import lockmanager.LockManager;
 import xaction.Xaction;
 
 import java.io.*;
@@ -24,9 +25,9 @@ public class ClientHandler<K extends Comparable<K>, R extends SerializableRecord
 
     private final Socket clientSocket;
 
-    private final ObjectInputStream objInStream;
+    private ObjectInputStream objInStream;
 
-    private final ObjectOutputStream objOutStream;
+    private ObjectOutputStream objOutStream;
 
     private RequestType lastReq = null;
 
@@ -147,6 +148,7 @@ public class ClientHandler<K extends Comparable<K>, R extends SerializableRecord
                 catch(Exception e){
                     objOutStream.writeObject(ResponseType.UNEXPECTED_FAILURE);
                     objOutStream.writeObject("Error during rollback");
+                    e.printStackTrace();
                     System.err.println("Something went really bad: " + e.getMessage());
                 }
                 break;
@@ -160,6 +162,7 @@ public class ClientHandler<K extends Comparable<K>, R extends SerializableRecord
                 }catch(Exception e){
                     objOutStream.writeObject(ResponseType.UNEXPECTED_FAILURE);
                     objOutStream.writeObject("Error during commit");
+                    e.printStackTrace();
                     System.err.println("Something went really bad: " + e.getMessage());
                 }
                 break;
@@ -184,11 +187,12 @@ public class ClientHandler<K extends Comparable<K>, R extends SerializableRecord
     @Override
     public void run() {
 
-        clientsXaction = new Xaction();
-
         RequestType req;
         ResponseType finalResponse = null;
         String finalMsg = null;
+
+        clientsXaction = new Xaction();
+        lastReq = null;
         try{
             req = (RequestType) objInStream.readObject();
             while(req != RequestType.END_XACTION){
@@ -209,6 +213,7 @@ public class ClientHandler<K extends Comparable<K>, R extends SerializableRecord
             finalResponse = ResponseType.RESTART;
         }
         catch(Exception _){
+            _.printStackTrace();
             finalResponse = ResponseType.UNEXPECTED_FAILURE;
             finalMsg = "Server terminated unexpectedly";
         }
@@ -221,10 +226,25 @@ public class ClientHandler<K extends Comparable<K>, R extends SerializableRecord
                 if(finalMsg != null)
                     objOutStream.writeObject(finalMsg);
                 objOutStream.flush();
+
+                if(finalResponse == ResponseType.RESTART){
+                    LockManager.getInstance().removeXactionFromWaitList(clientsXaction);
+                    run();
+                }
             }
-            objOutStream.close();
-            objInStream.close();
-            clientSocket.close();
+            if(objOutStream != null){
+                objOutStream.close();
+                objOutStream = null;
+            }
+
+            if(objInStream != null){
+                objInStream.close();
+                objInStream = null;
+            }
+
+            if(!clientSocket.isClosed()){
+                clientSocket.close();
+            }
         } catch (IOException e) {
             System.err.println("Error terminating communication " + e.getMessage());
         }

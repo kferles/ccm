@@ -18,9 +18,9 @@ public class RequestDispatcher<K extends Comparable<K>, R extends Identifiable<K
 
     private final Socket commSocket;
 
-    private final ObjectOutputStream objOutStream;
+    private ObjectOutputStream objOutStream;
 
-    private final ObjectInputStream objInStream;
+    private ObjectInputStream objInStream;
 
     private final Class<R> recordClass;
 
@@ -167,9 +167,18 @@ public class RequestDispatcher<K extends Comparable<K>, R extends Identifiable<K
 
     public void closeStreams(){
         try {
-            this.commSocket.close();
-            this.objInStream.close();
-            this.objOutStream.close();
+            if(!this.commSocket.isClosed())
+                this.commSocket.close();
+
+            if(this.objInStream != null){
+                this.objInStream.close();
+                this.objInStream = null;
+            }
+
+            if(this.objOutStream != null){
+                this.objOutStream.close();
+                this.objOutStream = null;
+            }
         } catch (IOException e) {
             System.err.println("Error while closing communication with server");
         }

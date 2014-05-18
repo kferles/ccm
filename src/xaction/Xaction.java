@@ -2,10 +2,8 @@ package xaction;
 
 import exception.InvalidBlockException;
 import file.blockfile.Block;
-import file.blockfile.BlockFile;
 import lockmanager.Lock;
 import lockmanager.LockManager;
-import util.Pair;
 
 import java.io.IOException;
 import java.nio.channels.FileChannel;
@@ -41,8 +39,8 @@ public class Xaction {
     }
 
     public void begin(){
-        Xaction prev = activeXactions.put(id, this);
-        assert prev == null;
+        if(!activeXactions.containsKey(id))
+            activeXactions.put(id, this);
     }
 
     public void end(){

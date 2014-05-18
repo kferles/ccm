@@ -4,11 +4,11 @@ import exception.RemoteFailure;
 import server.ResponseType;
 
 import java.io.IOException;
+import java.util.Random;
 
 public class XactionExecutor {
 
     public static void executeXaction(XactionTask task){
-        begin:
         try {
             task.runXaction();
         }
@@ -23,7 +23,14 @@ public class XactionExecutor {
                     System.err.println("Sever communication error: " + remoteFailure.getMessage());
                     break;
                 case RESTART:
-                    break begin;
+                    try {
+                        Random r = new Random();
+                        Thread.sleep(r.nextInt(5000) + 1);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                    executeXaction(task);
+                    break;
             }
         }
         task.closeConnections();

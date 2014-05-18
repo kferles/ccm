@@ -141,11 +141,13 @@ public class BufferManager {
         Integer num = block.getBlockNum();
 
         assert !block.isDirty();
-        assert occupiedBlocks.get(channel).get(num) != null;
+        Map<Integer, Pair<Block, Integer>> channelMap = occupiedBlocks.get(channel);
+        assert channelMap.get(num) != null;
 
-        Pair<Block, Integer> refCountBlock = occupiedBlocks.get(channel).remove(num);
+        Pair<Block, Integer> refCountBlock = channelMap.get(num);
 
         if(--refCountBlock.second == 0){
+            channelMap.remove(num);
             if(!cleanBlocks.containsKey(channel)){
                 cleanBlocks.put(channel, new HashMap<Integer, Block>());
             }

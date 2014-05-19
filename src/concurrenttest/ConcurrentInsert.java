@@ -1,5 +1,9 @@
 package concurrenttest;
 
+import client.sample.ConcurrentClient;
+import client.sample.InsertTask;
+import file.record.sample.EmployeeRecord;
+
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Random;
@@ -18,7 +22,7 @@ public class ConcurrentInsert {
             while(ids.contains(id))
                 id = r.nextInt();
             ids.add(id);
-            new Thread(new ConcurrentInsertClient(barrier, id)).start();
+            new Thread(new ConcurrentClient(new InsertTask("localhost", 2345, new EmployeeRecord(id, "firstname", "lastname")), barrier)).start();
         }
     }
 }

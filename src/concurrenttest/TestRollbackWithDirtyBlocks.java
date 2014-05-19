@@ -23,7 +23,6 @@ public class TestRollbackWithDirtyBlocks {
                 Integer id = r.nextInt();
                 action:{
                     try {
-                        System.out.println("here");
                         while(get(id) != null)
                             id = r.nextInt();
                     } catch (InvalidRecordSize invalidRecordSize) {
